@@ -12,8 +12,7 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "arch": "depcruise packages services apps --config .dependency-cruiser.cjs",
-    "terms": "bash tools/check-forbidden-terms.sh"
+    "arch": "depcruise packages services apps --config .dependency-cruiser.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
