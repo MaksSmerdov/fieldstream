@@ -1,0 +1,96 @@
+import type { z } from 'zod';
+import { telemetryRawSchema, telemetryReadingSchema } from '../telemetry.js';
+import { alarmEventSchema } from '../alarms.js';
+import { deviceStateSchema, pollCycleSchema } from '../events.js';
+
+/**
+ * Единственное место, где описаны топики. Отсюда генерируются конфиг создания топиков,
+ * таблица в README и страница контрактов в интерфейсе. Манифест это код, а не документация
+ * про код, поэтому разойтись с реальностью он не может.
+ */
+export interface TopicSpec<S extends z.ZodTypeAny> {
+  readonly name: string;
+  readonly schema: S;
+  /** Ключ партиционирования. Порядок гарантируется только внутри одного ключа. */
+  readonly keyOf: (payload: z.infer<S>) => string;
+  readonly partitions: number;
+  readonly cleanupPolicy: 'delete' | 'compact';
+  readonly retentionMs: number | null;
+  /** Сервис, которому разрешено писать в топик. Двух писателей быть не должно. */
+  readonly owner: string;
+  readonly why: string;
+}
+
+const define = <S extends z.ZodTypeAny>(spec: TopicSpec<S>): TopicSpec<S> => spec;
+
+const DAY_MS = 86_400_000;
+
+export const TOPICS = {
+  telemetryRaw: define({
+    name: 'fieldstream.telemetry.raw.v1',
+    schema: telemetryRawSchema,
+    keyOf: (p) => p.deviceCode,
+    partitions: 6,
+    cleanupPolicy: 'delete',
+    retentionMs: 7 * DAY_MS,
+    owner: 'edge-collector',
+    why: 'Семь дней это окно реплея: сырые кадры позволяют переиграть историю исправленным декодером.',
+  }),
+  pollCycles: define({
+    name: 'fieldstream.collector.cycles.v1',
+    schema: pollCycleSchema,
+    keyOf: (p) => p.lineCode,
+    partitions: 3,
+    cleanupPolicy: 'delete',
+    retentionMs: 3 * DAY_MS,
+    owner: 'edge-collector',
+    why: 'Пишется даже когда прибор не ответил и кадра нет: иначе отказ невидим.',
+  }),
+  telemetryReadings: define({
+    name: 'fieldstream.telemetry.readings.v1',
+    schema: telemetryReadingSchema,
+    keyOf: (p) => p.deviceCode,
+    partitions: 6,
+    cleanupPolicy: 'delete',
+    retentionMs: DAY_MS,
+    owner: 'stream-processor',
+    why: 'Шина живого фан-аута, а не хранилище: источник истины по истории это гипертаблица.',
+  }),
+  deviceState: define({
+    name: 'fieldstream.device.state.v1',
+    schema: deviceStateSchema,
+    keyOf: (p) => p.deviceCode,
+    partitions: 3,
+    cleanupPolicy: 'compact',
+    retentionMs: null,
+    owner: 'stream-processor',
+    why: 'Компактируемый топик хранит последнее состояние прибора, ключ это идентификатор узла.',
+  }),
+  alarmEvents: define({
+    name: 'fieldstream.alarms.events.v1',
+    schema: alarmEventSchema,
+    keyOf: (p) => p.deviceCode,
+    partitions: 3,
+    cleanupPolicy: 'delete',
+    retentionMs: 30 * DAY_MS,
+    owner: 'stream-processor',
+    why: 'Критичен порядок raised перед cleared внутри прибора, а не глобальный порядок по правилу.',
+  }),
+} as const;
+
+export type TopicKey = keyof typeof TOPICS;
+export type PayloadOf<K extends TopicKey> = z.infer<(typeof TOPICS)[K]['schema']>;
+
+export const TOPIC_NAMES: readonly string[] = Object.values(TOPICS).map((t) => t.name);
+
+/** Заголовки сообщения. Версия схемы едет рядом, чтобы консьюмер не гадал. */
+export const KAFKA_HEADERS = Object.freeze({
+  schema: 'x-schema',
+  schemaVersion: 'x-schema-version',
+  traceId: 'x-trace-id',
+  dlqOriginTopic: 'x-dlq-origin-topic',
+  dlqOriginPartition: 'x-dlq-origin-partition',
+  dlqOriginOffset: 'x-dlq-origin-offset',
+  dlqErrorClass: 'x-dlq-error-class',
+  dlqAttempt: 'x-dlq-attempt',
+});
