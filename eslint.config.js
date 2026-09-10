@@ -1,0 +1,69 @@
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+
+const noWallClock = {
+  selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+  message: 'Время берётся только из порта Clock (packages/domain/src/clock).',
+};
+const noBareNewDate = {
+  selector: 'NewExpression[callee.name="Date"][arguments.length=0]',
+  message: 'Время берётся только из порта Clock (packages/domain/src/clock).',
+};
+
+export default tseslint.config(
+  { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', '**/.turbo/**'] },
+  js.configs.recommended,
+  ...tseslint.configs.strictTypeChecked,
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.eslint.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+      'no-console': 'error',
+      'no-restricted-syntax': ['error', noWallClock, noBareNewDate],
+    },
+  },
+  {
+    files: ['packages/contracts/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['kafkajs', 'pg', 'drizzle-orm', 'react'],
+          patterns: ['@nestjs/*', 'node:*'],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/domain/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['kafkajs', 'pg', 'drizzle-orm'],
+          patterns: ['@nestjs/*'],
+        },
+      ],
+    },
+  },
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts', '**/vitest.config.ts'],
+    rules: { 'no-restricted-syntax': 'off', '@typescript-eslint/no-non-null-assertion': 'off' },
+  },
+  {
+    files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: { module: 'writable', require: 'readonly' } },
+    rules: { 'no-restricted-syntax': 'off', 'no-undef': 'off' },
+  },
+);

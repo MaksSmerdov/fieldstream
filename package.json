@@ -1,0 +1,30 @@
+{
+  "name": "fieldstream",
+  "private": true,
+  "packageManager": "pnpm@10.18.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "tsc --noEmit -p tsconfig.eslint.json",
+    "test": "turbo run test",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "arch": "depcruise packages services apps --config .dependency-cruiser.cjs",
+    "terms": "bash tools/check-forbidden-terms.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@types/node": "^22.9.0",
+    "dependency-cruiser": "^16.5.0",
+    "eslint": "^9.15.0",
+    "prettier": "^3.3.3",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.15.0",
+    "vitest": "^2.1.5"
+  },
+  "type": "module"
+}
