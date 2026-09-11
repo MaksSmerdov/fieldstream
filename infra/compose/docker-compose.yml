@@ -1,0 +1,98 @@
+name: fieldstream
+
+services:
+  timescaledb:
+    image: timescale/timescaledb-ha:pg16.6-ts2.17.2
+    env_file: ../../.env
+    environment:
+      POSTGRES_DB: fieldstream
+    command: ['postgres', '-c', 'shared_buffers=512MB']
+    shm_size: 256mb
+    volumes:
+      - tsdb-data:/home/postgres/pgdata
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d fieldstream']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  kafka:
+    image: apache/kafka:3.9.0
+    environment:
+      CLUSTER_ID: ZmllbGRzdHJlYW0tZGVtbw
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,PLAINTEXT_HOST://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms512m
+    ports:
+      - '29092:29092'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    mem_limit: 1g
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'KAFKA_HEAP_OPTS=-Xmx64m /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null',
+        ]
+      interval: 10s
+      timeout: 20s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  kafka-init:
+    image: apache/kafka:3.9.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ['/bin/bash', '/opt/fieldstream/create-topics.sh']
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      TOPICS_FILE: /opt/fieldstream/topics.conf
+      KAFKA_HEAP_OPTS: -Xmx128m
+    volumes:
+      - ../kafka:/opt/fieldstream:ro
+    restart: 'no'
+
+  device-sim:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.node
+      args:
+        SERVICE: device-sim
+    image: fieldstream/device-sim:dev
+    env_file: ../../.env
+    ports:
+      - '5020-5023:5020-5023'
+      - '8090:8090'
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  kafka-ui:
+    image: kafbat/kafka-ui:v1.5.0
+    profiles: ['tools']
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: fieldstream
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - '8081:8080'
+
+volumes:
+  tsdb-data:
+  kafka-data:

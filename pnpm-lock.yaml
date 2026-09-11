@@ -149,6 +149,25 @@ importers:
         specifier: ^2.1.5
         version: 2.1.9(@types/node@22.20.2)
 
+  tools/topic-matrix:
+    dependencies:
+      '@fieldstream/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.2
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.5
+        version: 2.1.9(@types/node@22.20.2)
+
 packages:
 
   '@esbuild/aix-ppc64@0.21.5':
