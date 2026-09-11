@@ -111,14 +111,13 @@ export const buildSimulationValues = (
   return values;
 };
 
-/** Те же значения, но уложенные в регистры тем же кодеком, что читает боевой опрос. */
-export const buildSimulationRegisters = (
+/** Значения, уложенные в регистры тем же кодеком, что читает боевой опрос. */
+export const encodeSimulationRegisters = (
   profile: DeviceProfile,
-  seed: number,
+  values: ReadonlyMap<string, DecodedValue>,
 ): SimulationRegisters => {
   const holding = new Map<number, number>();
   const input = new Map<number, number>();
-  const values = buildSimulationValues(profile, seed);
 
   for (const entry of listPlanEntries(profile)) {
     const words = encodeParam(values.get(entry.param.key) ?? null, entry.param);
@@ -131,8 +130,20 @@ export const buildSimulationRegisters = (
   return { holding, input };
 };
 
+/** Значения buildSimulationValues, уложенные в регистры. */
+export const buildSimulationRegisters = (
+  profile: DeviceProfile,
+  seed: number,
+): SimulationRegisters => encodeSimulationRegisters(profile, buildSimulationValues(profile, seed));
+
+/** Диапазон регистров одного запроса чтения. */
+export type RegisterSpan = Pick<PlanBlock, 'registerType' | 'startAddress' | 'registerCount'>;
+
 /** Слова блока так, как их вернул бы прибор: неописанные регистры читаются нулями. */
-export const readSimulatedBlock = (registers: SimulationRegisters, block: PlanBlock): number[] => {
+export const readSimulatedBlock = (
+  registers: SimulationRegisters,
+  block: RegisterSpan,
+): number[] => {
   const source = block.registerType === 'holding' ? registers.holding : registers.input;
   const words: number[] = [];
 

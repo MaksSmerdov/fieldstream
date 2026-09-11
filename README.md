@@ -5,8 +5,8 @@
 
 Демо-стенд: сеть холодильного оборудования, 24 прибора на 4 последовательных линиях за 2 шлюзами.
 
-> **Статус: в разработке.** Готовы пакеты контрактов, кодека регистров, доменной логики и профилей приборов.
-> Сервисы, инфраструктура и интерфейс собираются по плану из [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+> **Статус: в разработке.** Готовы пакеты контрактов, кодека регистров, доменной логики и профилей приборов, симулятор приборов, сборщик с публикацией в Kafka и базовая инфраструктура compose.
+> Остальные сервисы и интерфейс собираются по плану из [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 > Дорожная карта и текущее состояние ниже.
 
 ---
@@ -15,14 +15,20 @@
 
 Где в коде лежит самое содержательное, чтобы не искать по дереву.
 
-| Что                                                                  | Где                                               |
-| -------------------------------------------------------------------- | ------------------------------------------------- |
-| Декларативный профиль прибора и автосборка плана блочного чтения     | `packages/device-profiles/src/read-plan.ts`       |
-| Один кодек на запись и на чтение, round-trip по всем порядкам байтов | `packages/modbus-codec/src/`                      |
-| Уставки алармов по ключу (прибор, метрика, **режим**) с гистерезисом | `packages/domain/src/alarms.ts`                   |
-| Дерево здоровья с машинной причиной статуса                          | `packages/domain/src/health.ts`                   |
-| Манифест топиков Kafka как единственный источник истины              | `packages/contracts/src/kafka/topics.manifest.ts` |
-| Правило выбора источника серии вместо запроса без лимита             | `packages/contracts/src/series.ts`                |
+| Что                                                                                                                  | Где                                                        |
+| -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Декларативный профиль прибора и автосборка плана блочного чтения                                                     | `packages/device-profiles/src/read-plan.ts`                |
+| Один кодек на запись и на чтение, round-trip по всем порядкам байтов                                                 | `packages/modbus-codec/src/`                               |
+| Уставки алармов по ключу (прибор, метрика, **режим**) с гистерезисом                                                 | `packages/domain/src/alarms.ts`                            |
+| Дерево здоровья с машинной причиной статуса                                                                          | `packages/domain/src/health.ts`                            |
+| Манифест топиков Kafka как единственный источник истины                                                              | `packages/contracts/src/kafka/topics.manifest.ts`          |
+| Правило выбора источника серии вместо запроса без лимита                                                             | `packages/contracts/src/series.ts`                         |
+| Свой сервер Modbus TCP стенда: очередь на линию, время кадра по скорости шины, поломки на уровне кадра               | `services/device-sim/src/modbus/`                          |
+| Тепловая модель камеры (гистерезис, оттайка, дверь) и счётчик на вводе, повторяющий её нагрузку                      | `services/device-sim/src/physics/`                         |
+| Конфиг создания топиков генерируется из манифеста и сверяется тестом                                                 | `tools/topic-matrix/`                                      |
+| Воркер линии: таймаут библиотеки, жёсткий таймаут и сторож цикла, размыкатель на прибор, переподключение с джиттером | `services/edge-collector/src/polling/line-worker.ts`       |
+| Буфер перед Kafka: опрос не ждёт брокер, при переполнении отбрасываются самые старые кадры                           | `services/edge-collector/src/publish/bounded-publisher.ts` |
+| Писать в топик может только его владелец из манифеста, схема проверяется на публикации                               | `packages/kafka/src/message.ts`                            |
 
 ---
 
@@ -51,8 +57,13 @@ packages/
   modbus-codec/     кодирование и декодирование регистров, четыре порядка байтов
   device-profiles/  описания моделей приборов, валидатор, построитель плана чтения, симулятор
   domain/           алармы, дерево здоровья, детектор событий, фильтр скачков, порт времени
-services/           edge-collector, stream-processor, api-gateway, device-sim
+  kafka/            подготовка сообщений по манифесту топиков, продюсер kafkajs
+services/
+  device-sim/       стенд приборов: Modbus TCP, физическая модель, API поломок
+  edge-collector/   опрос линий, размыкатели, публикация сырых кадров и циклов опроса в Kafka
 apps/web/           React 19 SPA
+infra/              общий Dockerfile, compose, создание топиков Kafka
+tools/              проверка границ зависимостей, генератор конфига топиков
 docs/ARCHITECTURE.md  полный инженерный план проекта
 ```
 
@@ -69,21 +80,52 @@ pnpm test             # vitest по пакетам, включая провер�
 pnpm typecheck        # типы, включая тестовые файлы
 pnpm lint             # eslint, включая тестовые файлы
 pnpm format:check     # prettier
+pnpm topics:gen       # пересобрать infra/kafka/topics.conf из манифеста топиков
 ```
 
 Требуется Node 22 и pnpm 10.
+
+### Стенд приборов
+
+```bash
+cp .env.example .env  # задать POSTGRES_PASSWORD
+pnpm stack:up         # Kafka, TimescaleDB, топики, device-sim и edge-collector в Docker
+```
+
+Симулятор слушает Modbus TCP на портах 5020..5023 (линии L1..L4) и отдаёт управляющий API на порту 8090:
+
+```bash
+curl localhost:8090/sim/state
+curl -X POST localhost:8090/sim/fault -H 'content-type: application/json' \
+  -d '{"targetKind":"device","targetId":"RC-104","kind":"silent","ttlSec":120}'
+curl -X POST localhost:8090/sim/scenario/night-defrost
+curl -X DELETE localhost:8090/sim/faults
+```
+
+Виды поломок: `silent`, `crc`, `stall`, `exception`, `offline` (порт шлюза закрыт), `power_dip`, `offscale`, `door_stuck`, `defrost`. `GET /sim/state` отдаёт эталон: значения всех приборов, действующие поломки и счётчики запросов по линиям.
+
+Kafka доступна с хоста на `localhost:29092`, веб-интерфейс к ней поднимается профилем: `docker compose -f infra/compose/docker-compose.yml --profile tools up -d kafka-ui` (http://localhost:8081).
+
+Сборщик опрашивает все четыре линии и пишет сырые кадры в `fieldstream.telemetry.raw.v1` (ключ это код прибора), а итог каждого обращения, в том числе неудачного, в `fieldstream.collector.cycles.v1`. Портов наружу у него нет, состояние воркеров, размыкателей и планов чтения смотрится изнутри сети:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml exec edge-collector wget -qO- 127.0.0.1:8091/internal/lines
+```
+
+Для ежедневной разработки без пересборки образов `pnpm infra:up` поднимает только брокер и базу, а `pnpm dev` запускает сервисы на хосте в режиме наблюдения за файлами (переменные берутся из `.env`).
 
 ---
 
 ## Дорожная карта
 
 - [x] Каркас монорепы, контракты, кодек, профили приборов, доменная логика
-- [ ] `device-sim`: Modbus TCP серверы, тепловая модель, API инъекции неисправностей
-- [ ] `edge-collector`: воркер на линию, три предохранителя, размыкатель, публикация в Kafka
+- [x] `device-sim`: Modbus TCP серверы, тепловая модель, API инъекции неисправностей
+- [x] `edge-collector`: воркер на линию, три предохранителя, размыкатель, публикация в Kafka
 - [ ] `stream-processor`: декодирование, идемпотентная запись в TimescaleDB, алармы
 - [ ] `api-gateway`: авторизация, REST, SSE
 - [ ] SPA: топология, прибор, алармы
-- [ ] Docker Compose, засев истории, README с диаграммами и замерами
+- [x] Базовый compose: Kafka, TimescaleDB, создание топиков из манифеста, стенд приборов
+- [ ] Полный стек в compose, засев истории, README с диаграммами и замерами
 - [ ] После публикации: экран Pipeline, Fault Lab, Replay Lab
 
 ---

@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1.7
+ARG NODE_IMAGE=node:22-alpine
+
+FROM ${NODE_IMAGE} AS base
+ENV PNPM_HOME=/pnpm \
+    npm_config_store_dir=/pnpm/store \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+WORKDIR /repo
+
+FROM base AS fetch
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+
+FROM fetch AS build
+ARG SERVICE
+COPY . .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --offline --frozen-lockfile
+RUN pnpm --filter "@fieldstream/${SERVICE}..." run build
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm --filter "@fieldstream/${SERVICE}" deploy --prod --legacy /out
+
+FROM ${NODE_IMAGE} AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+RUN addgroup -g 10001 app && adduser -u 10001 -G app -D app
+COPY --from=build --chown=app:app /out ./
+USER app
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \
+  CMD ["node", "dist/healthcheck.js"]
+CMD ["node", "dist/main.js"]
