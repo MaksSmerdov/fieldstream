@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import { telemetryRawSchema, telemetryReadingSchema } from '../telemetry.js';
 import { alarmEventSchema } from '../alarms.js';
 import { deviceStateSchema, pollCycleSchema } from '../events.js';
@@ -26,6 +26,12 @@ export interface TopicSpec<S extends z.ZodTypeAny> {
 const define = <S extends z.ZodTypeAny>(spec: TopicSpec<S>): TopicSpec<S> => spec;
 
 const DAY_MS = 86_400_000;
+
+/** Байты исходного сообщения как есть: неразбираемое сообщение иначе физически не положить в очередь. */
+const rawBytesSchema = z.custom<Uint8Array>(
+  (value) => value instanceof Uint8Array,
+  'ожидаются сырые байты',
+);
 
 export const TOPICS = {
   telemetryRaw: define({
@@ -87,6 +93,18 @@ export const TOPICS = {
     owner: 'stream-processor',
     why: 'Критичен порядок raised перед cleared внутри прибора, а не глобальный порядок по правилу.',
   }),
+  telemetryRawDlq: define({
+    name: 'fieldstream.telemetry.raw.dlq.v1',
+    schema: rawBytesSchema,
+    keyOf: () => '',
+    partitions: 1,
+    cleanupPolicy: 'delete',
+    retentionMs: 14 * DAY_MS,
+    owner: 'stream-processor',
+    why:
+      'Сырые байты без попытки разбора и ключ исходного сообщения: после повторной подачи ' +
+      'кадр вернётся в ту же партицию, и порядок внутри прибора не развалится.',
+  }),
 } as const;
 
 export type TopicKey = keyof typeof TOPICS;
@@ -102,6 +120,10 @@ export const KAFKA_HEADERS = Object.freeze({
   dlqOriginTopic: 'x-dlq-origin-topic',
   dlqOriginPartition: 'x-dlq-origin-partition',
   dlqOriginOffset: 'x-dlq-origin-offset',
+  dlqOriginTimestamp: 'x-dlq-origin-timestamp',
   dlqErrorClass: 'x-dlq-error-class',
+  dlqError: 'x-dlq-error',
   dlqAttempt: 'x-dlq-attempt',
+  dlqFirstFailedAt: 'x-dlq-first-failed-at',
+  dlqConsumerGroup: 'x-dlq-consumer-group',
 });

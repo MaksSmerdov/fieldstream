@@ -89,6 +89,7 @@ const SAMPLES: { readonly [K in TopicKey]: PayloadOf<K> } = {
     occurredAt: TS,
     traceId: TRACE_ID,
   },
+  telemetryRawDlq: new Uint8Array([0x7b, 0xff, 0x00]),
 };
 
 describe('манифест топиков', () => {
@@ -162,6 +163,8 @@ describe('манифест топиков', () => {
     expect(TOPICS.telemetryReadings.schema.safeParse(SAMPLES.telemetryReadings).success).toBe(true);
     expect(TOPICS.deviceState.schema.safeParse(SAMPLES.deviceState).success).toBe(true);
     expect(TOPICS.alarmEvents.schema.safeParse(SAMPLES.alarmEvents).success).toBe(true);
+    expect(TOPICS.telemetryRawDlq.schema.safeParse(SAMPLES.telemetryRawDlq).success).toBe(true);
+    expect(TOPICS.telemetryRawDlq.schema.safeParse('не байты').success).toBe(false);
   });
 
   it('keyOf на валидном payload возвращает непустой ключ партиции', () => {
