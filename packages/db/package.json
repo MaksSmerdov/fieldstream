@@ -1,0 +1,39 @@
+{
+  "name": "@fieldstream/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "migrate": "node dist/migrate-cli.js"
+  },
+  "dependencies": {
+    "@fieldstream/contracts": "workspace:*",
+    "@fieldstream/device-profiles": "workspace:*",
+    "node-pg-migrate": "^9.0.0",
+    "pg": "^8.23.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.1.0",
+    "@types/node": "^22.9.0",
+    "@types/pg": "^8.23.1",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.11"
+  }
+}
