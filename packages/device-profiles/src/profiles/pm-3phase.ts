@@ -1,6 +1,6 @@
 import { deviceCodeSchema } from '@fieldstream/contracts';
 import type { DeviceCode, DeviceProfile } from '@fieldstream/contracts';
-import { defineDeviceProfile } from '../validate.js';
+import { defineDeviceProfile } from './validate.js';
 
 /** Приборы, которые обслуживает профиль: трёхфазные счётчики на вводах. */
 export const PM3PHASE_DEVICE_CODES: readonly DeviceCode[] = Array.from({ length: 12 }, (_, index) =>

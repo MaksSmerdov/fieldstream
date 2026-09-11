@@ -7,6 +7,7 @@ interface Readiness {
   readonly kafka: boolean;
   readonly lines: number;
   readonly buffered: number;
+  readonly oldestPendingMs: number;
 }
 
 /** Живость и готовность. Готов, когда продюсер подключён и получен конфиг линий. */
@@ -27,13 +28,14 @@ export class HealthController {
 
   @Get('ready')
   public ready(): Readiness {
-    const kafka = this.publisher.isConnected();
+    const kafka = this.publisher.isHealthy();
     const lines = this.lines.lineCount();
     const readiness: Readiness = {
       status: kafka && lines > 0 ? 'ready' : 'starting',
       kafka,
       lines,
       buffered: this.publisher.bufferSize(),
+      oldestPendingMs: this.publisher.oldestPendingMs(),
     };
 
     if (readiness.status !== 'ready') throw new ServiceUnavailableException(readiness);

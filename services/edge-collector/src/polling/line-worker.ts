@@ -11,8 +11,8 @@ import {
   recordSuccess,
 } from '../breaker/breaker.js';
 import type { Breaker } from '../breaker/breaker.js';
-import type { Logger } from '../logging/logger.js';
-import { createLogThrottle } from '../logging/throttle.js';
+import type { Logger } from '@fieldstream/nest-common';
+import { createLogThrottle } from '@fieldstream/nest-common';
 import { reconnectDelay } from '../transport/backoff.js';
 import type { BackoffStep } from '../transport/backoff.js';
 import { classifyError, needsReconnect } from '../transport/errors.js';

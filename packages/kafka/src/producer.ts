@@ -56,8 +56,12 @@ export const createKafkaClient = (options: KafkaClientOptions): Kafka =>
     logCreator: logCreator(options.log),
   });
 
-/** Продюсер с настройками проекта. */
-export const createProducer = (kafka: Kafka): Producer => kafka.producer(PRODUCER_CONFIG);
+/**
+ * Продюсер с настройками проекта. Переопределение нужно тому, кто сам не должен ждать брокер
+ * бесконечно: потребитель с неотправленной пачкой иначе перестанет слать heartbeat.
+ */
+export const createProducer = (kafka: Kafka, overrides: Partial<ProducerConfig> = {}): Producer =>
+  kafka.producer({ ...PRODUCER_CONFIG, ...overrides });
 
 /** Сообщения, разложенные по топикам в исходном порядке: так их принимает sendBatch. */
 export const groupByTopic = (messages: readonly OutgoingMessage[]): TopicMessages[] => {
@@ -77,8 +81,8 @@ export const groupByTopic = (messages: readonly OutgoingMessage[]): TopicMessage
 };
 
 /**
- * Отправка пачки. Сжатие на стороне брокера: у топика сырых кадров compression.type=lz4,
- * а кодек LZ4 для kafkajs тянет нативную сборку, которой нет смысла платить за это.
+ * Отправка пачки. Сжатие делает брокер по настройке топика, и выбран gzip: его kafkajs
+ * распаковывает сам, а для LZ4 потребителям понадобился бы сторонний кодек.
  */
 export const sendMessages = async (
   producer: Producer,

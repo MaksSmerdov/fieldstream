@@ -1,7 +1,7 @@
-import type { z } from 'zod';
-import { telemetryRawSchema, telemetryReadingSchema } from '../telemetry.js';
-import { alarmEventSchema } from '../alarms.js';
-import { deviceStateSchema, pollCycleSchema } from '../events.js';
+import { z } from 'zod';
+import { telemetryRawSchema, telemetryReadingSchema } from '../messages/telemetry.js';
+import { alarmEventSchema } from '../messages/alarms.js';
+import { deviceStateSchema, pollCycleSchema } from '../messages/events.js';
 
 /**
  * Единственное место, где описаны топики. Отсюда генерируются конфиг создания топиков,
@@ -27,6 +27,12 @@ const define = <S extends z.ZodTypeAny>(spec: TopicSpec<S>): TopicSpec<S> => spe
 
 const DAY_MS = 86_400_000;
 
+/** Байты исходного сообщения как есть: неразбираемое сообщение иначе физически не положить в очередь. */
+const rawBytesSchema = z.custom<Uint8Array>(
+  (value) => value instanceof Uint8Array,
+  'ожидаются сырые байты',
+);
+
 export const TOPICS = {
   telemetryRaw: define({
     name: 'fieldstream.telemetry.raw.v1',
@@ -35,7 +41,7 @@ export const TOPICS = {
     partitions: 6,
     cleanupPolicy: 'delete',
     retentionMs: 7 * DAY_MS,
-    configs: { 'compression.type': 'lz4' },
+    configs: { 'compression.type': 'gzip' },
     owner: 'edge-collector',
     why: 'Семь дней это окно реплея: сырые кадры позволяют переиграть историю исправленным декодером.',
   }),
@@ -87,6 +93,18 @@ export const TOPICS = {
     owner: 'stream-processor',
     why: 'Критичен порядок raised перед cleared внутри прибора, а не глобальный порядок по правилу.',
   }),
+  telemetryRawDlq: define({
+    name: 'fieldstream.telemetry.raw.dlq.v1',
+    schema: rawBytesSchema,
+    keyOf: () => '',
+    partitions: 1,
+    cleanupPolicy: 'delete',
+    retentionMs: 14 * DAY_MS,
+    owner: 'stream-processor',
+    why:
+      'Сырые байты без попытки разбора и ключ исходного сообщения: после повторной подачи ' +
+      'кадр вернётся в ту же партицию, и порядок внутри прибора не развалится.',
+  }),
 } as const;
 
 export type TopicKey = keyof typeof TOPICS;
@@ -102,6 +120,10 @@ export const KAFKA_HEADERS = Object.freeze({
   dlqOriginTopic: 'x-dlq-origin-topic',
   dlqOriginPartition: 'x-dlq-origin-partition',
   dlqOriginOffset: 'x-dlq-origin-offset',
+  dlqOriginTimestamp: 'x-dlq-origin-timestamp',
   dlqErrorClass: 'x-dlq-error-class',
+  dlqError: 'x-dlq-error',
   dlqAttempt: 'x-dlq-attempt',
+  dlqFirstFailedAt: 'x-dlq-first-failed-at',
+  dlqConsumerGroup: 'x-dlq-consumer-group',
 });

@@ -6,7 +6,7 @@ import { HealthController } from './http/health.controller.js';
 import { InternalController } from './http/internal.controller.js';
 import { MetricsController } from './http/metrics.controller.js';
 import { LinesService } from './lines/lines.service.js';
-import type { Logger } from './logging/logger.js';
+import type { Logger } from '@fieldstream/nest-common';
 import type { CollectorMetrics } from './metrics/metrics.js';
 import { KafkaPublisher } from './publish/kafka-publisher.js';
 import { CLOCK, ENV, LOGGER, METRICS } from './tokens.js';
