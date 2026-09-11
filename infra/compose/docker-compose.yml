@@ -67,6 +67,22 @@ services:
       - ../kafka:/opt/fieldstream:ro
     restart: 'no'
 
+  migrator:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.node
+      args:
+        SERVICE: db
+    image: fieldstream/migrator:dev
+    command: ['node', 'dist/migrate-cli.js']
+    env_file: ../../.env
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    restart: 'no'
+
   device-sim:
     build:
       context: ../..
