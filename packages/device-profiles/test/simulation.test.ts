@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { decodeParam } from '@fieldstream/modbus-codec';
 import type { DecodedValue } from '@fieldstream/modbus-codec';
 import type { DeviceProfile } from '@fieldstream/contracts';
-import { buildDeviceReadPlan, listPlanEntries, paramWordsInBlock } from '../src/read-plan.js';
+import {
+  buildDeviceReadPlan,
+  listPlanEntries,
+  paramWordsInBlock,
+} from '../src/frames/read-plan.js';
 import {
   buildSimulationRegisters,
   buildSimulationValues,

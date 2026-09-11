@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { HealthNode } from '../src/health.js';
-import { DEFAULT_HEALTH_POLICY, healthNodeSchema } from '../src/health.js';
+import type { HealthNode } from '../../src/messages/health.js';
+import { DEFAULT_HEALTH_POLICY, healthNodeSchema } from '../../src/messages/health.js';
 
 const TS = '2026-09-11T10:00:00.000Z';
 

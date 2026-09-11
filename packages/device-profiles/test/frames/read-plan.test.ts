@@ -3,15 +3,19 @@ import { decodeParam } from '@fieldstream/modbus-codec';
 import type { DecodedValue } from '@fieldstream/modbus-codec';
 import { deviceProfileSchema } from '@fieldstream/contracts';
 import type { DataType, DeviceProfile, ReadBlock, RegisterType } from '@fieldstream/contracts';
-import { buildDeviceReadPlan, listPlanEntries, paramWordsInBlock } from '../src/read-plan.js';
-import type { ReadPlan } from '../src/read-plan.js';
+import {
+  buildDeviceReadPlan,
+  listPlanEntries,
+  paramWordsInBlock,
+} from '../../src/frames/read-plan.js';
+import type { ReadPlan } from '../../src/frames/read-plan.js';
 import {
   buildSimulationRegisters,
   buildSimulationValues,
   readSimulatedBlock,
-} from '../src/simulation.js';
-import { rc2000Profile } from '../src/profiles/rc-2000.js';
-import { pm3PhaseProfile } from '../src/profiles/pm-3phase.js';
+} from '../../src/simulation.js';
+import { rc2000Profile } from '../../src/profiles/rc-2000.js';
+import { pm3PhaseProfile } from '../../src/profiles/pm-3phase.js';
 
 interface TestParam {
   key: string;

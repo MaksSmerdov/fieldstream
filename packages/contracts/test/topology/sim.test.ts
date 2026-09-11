@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { simFaultRequestSchema, simSpeedRequestSchema } from '../src/sim.js';
+import { simFaultRequestSchema, simSpeedRequestSchema } from '../../src/topology/sim.js';
 
 /** Сообщения ошибок разбора: по ним видно, какое правило сработало. */
 const messagesOf = (input: unknown): string[] => {

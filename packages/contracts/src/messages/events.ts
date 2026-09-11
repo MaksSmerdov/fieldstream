@@ -5,8 +5,8 @@ import {
   isoTimestampSchema,
   lineCodeSchema,
   traceIdSchema,
-} from './primitives.js';
-import { deviceModeSchema } from './device.js';
+} from '../primitives.js';
+import { deviceModeSchema } from '../topology/device.js';
 import { healthReasonSchema, healthStatusSchema } from './health.js';
 
 /** Итог одного обращения к прибору. Отдельно от телеметрии, потому что пишется и при отказе. */

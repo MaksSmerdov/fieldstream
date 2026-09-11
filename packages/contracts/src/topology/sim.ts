@@ -4,7 +4,7 @@ import {
   isoTimestampSchema,
   lineCodeSchema,
   slaveIdSchema,
-} from './primitives.js';
+} from '../primitives.js';
 
 /**
  * Поломки, которые умеет вносить стенд. Транспортные (silent, crc, stall, exception) бьют

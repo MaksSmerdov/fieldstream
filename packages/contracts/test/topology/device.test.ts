@@ -6,7 +6,7 @@ import {
   MUTED_MODES,
   paramSpecSchema,
   WORDS_BY_DATA_TYPE,
-} from '../src/device.js';
+} from '../../src/topology/device.js';
 
 /** Ошибки схемы как "код путь: текст" или падение теста, если кривое значение прошло разбор. */
 const issuesOf = (schema: z.ZodTypeAny, value: unknown): string => {

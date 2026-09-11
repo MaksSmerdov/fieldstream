@@ -1,6 +1,6 @@
 import type { DeviceProfile } from '@fieldstream/contracts';
-import { PM3PHASE_DEVICE_CODES, pm3PhaseProfile } from './profiles/pm-3phase.js';
-import { RC2000_DEVICE_CODES, rc2000Profile } from './profiles/rc-2000.js';
+import { PM3PHASE_DEVICE_CODES, pm3PhaseProfile } from './pm-3phase.js';
+import { RC2000_DEVICE_CODES, rc2000Profile } from './rc-2000.js';
 
 /** Все известные модели приборов. Новая модель это один файл и одна строка здесь. */
 export const DEVICE_PROFILES: readonly DeviceProfile[] = Object.freeze([

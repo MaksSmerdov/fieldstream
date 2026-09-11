@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { deviceCodeSchema, isoTimestampSchema, traceIdSchema } from './primitives.js';
-import { deviceModeSchema } from './device.js';
+import { deviceCodeSchema, isoTimestampSchema, traceIdSchema } from '../primitives.js';
+import { deviceModeSchema } from '../topology/device.js';
 
 export const severitySchema = z.enum(['info', 'warning', 'critical']);
 export type Severity = z.infer<typeof severitySchema>;

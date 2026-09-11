@@ -1,8 +1,8 @@
 import { encodeParam } from '@fieldstream/modbus-codec';
 import type { DecodedValue } from '@fieldstream/modbus-codec';
 import type { DataType, DeviceProfile, ParamSpec } from '@fieldstream/contracts';
-import { listPlanEntries } from './read-plan.js';
-import type { PlanBlock } from './read-plan.js';
+import { listPlanEntries } from './frames/read-plan.js';
+import type { PlanBlock } from './frames/read-plan.js';
 
 /** Карта регистров прибора: ровно то, что вернул бы настоящий шлюз. */
 export interface SimulationRegisters {

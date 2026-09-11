@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pm3PhaseProfile, rc2000Profile } from '@fieldstream/device-profiles';
-import { connectionUrl } from '../src/connection.js';
-import { metricDefsOf, profileChecksum } from '../src/topology.js';
+import { connectionUrl } from '../../src/setup/connection.js';
+import { metricDefsOf, profileChecksum } from '../../src/store/topology.js';
 
 describe('описания метрик', () => {
   it('вид метрики берётся из профиля: число, перечисление или слово аварий', () => {

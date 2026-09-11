@@ -1,10 +1,10 @@
 import pg from 'pg';
 import { z } from 'zod';
 import { DEMO_STAND, DEVICE_PROFILES } from '@fieldstream/device-profiles';
-import { connectionUrl } from './connection.js';
-import { runMigrations } from './migrate.js';
-import { ROLES, bootstrapDatabase } from './roles.js';
-import { syncTopology } from './topology.js';
+import { connectionUrl } from './setup/connection.js';
+import { runMigrations } from './setup/migrate.js';
+import { ROLES, bootstrapDatabase } from './setup/roles.js';
+import { syncTopology } from './store/topology.js';
 
 const secret = z.string().min(1, 'пароль обязателен, значения по умолчанию нет');
 

@@ -1,8 +1,8 @@
 import { deviceProfileSchema } from '@fieldstream/contracts';
 import type { DeviceProfile, ReadBlock, RegisterType } from '@fieldstream/contracts';
 import type { z } from 'zod';
-import { entryFitsBlock, listPlanEntries } from './read-plan.js';
-import type { PlanEntry } from './read-plan.js';
+import { entryFitsBlock, listPlanEntries } from '../frames/read-plan.js';
+import type { PlanEntry } from '../frames/read-plan.js';
 
 /** Профиль до применения умолчаний схемы: то, что реально пишут в файле модели прибора. */
 export type DeviceProfileInput = z.input<typeof deviceProfileSchema>;

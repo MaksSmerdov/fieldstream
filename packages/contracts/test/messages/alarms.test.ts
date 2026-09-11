@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
-import { alarmEventSchema, alarmRuleSchema } from '../src/alarms.js';
+import { alarmEventSchema, alarmRuleSchema } from '../../src/messages/alarms.js';
 
 /** Ошибки схемы как "код путь: текст" или падение теста, если кривое значение прошло разбор. */
 const issuesOf = (schema: z.ZodTypeAny, value: unknown): string => {

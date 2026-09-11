@@ -11,9 +11,9 @@ import {
   listPlanEntries,
   paramWordsInBlock,
   MODBUS_MAX_BLOCK_REGISTERS,
-} from '../src/read-plan.js';
-import type { ReadPlan } from '../src/read-plan.js';
-import { buildSimulationRegisters, readSimulatedBlock } from '../src/simulation.js';
+} from '../../src/frames/read-plan.js';
+import type { ReadPlan } from '../../src/frames/read-plan.js';
+import { buildSimulationRegisters, readSimulatedBlock } from '../../src/simulation.js';
 
 const registerTypeArb: Arbitrary<RegisterType> = fc
   .boolean()

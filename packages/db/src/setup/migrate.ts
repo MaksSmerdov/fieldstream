@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { runner } from 'node-pg-migrate';
 
 /** Каталог SQL-миграций: лежит рядом с исходниками и с собранным пакетом. */
-export const MIGRATIONS_DIR = fileURLToPath(new URL('../migrations', import.meta.url));
+export const MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations', import.meta.url));
 
 export interface MigrateOptions {
   readonly databaseUrl: string;

@@ -8,8 +8,8 @@ import {
   siteCodeSchema,
   slaveIdSchema,
   traceIdSchema,
-} from './primitives.js';
-import { registerTypeSchema } from './device.js';
+} from '../primitives.js';
+import { registerTypeSchema } from '../topology/device.js';
 
 /**
  * Прочитанный блок регистров как он пришёл с линии.

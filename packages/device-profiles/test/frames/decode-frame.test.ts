@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { DeviceProfile, RawBlock } from '@fieldstream/contracts';
 import type { DecodedValue } from '@fieldstream/modbus-codec';
-import { profileByVersion } from '../src/catalog.js';
-import { decodeFrame } from '../src/decode-frame.js';
-import { buildDeviceReadPlan } from '../src/read-plan.js';
+import { profileByVersion } from '../../src/profiles/catalog.js';
+import { decodeFrame } from '../../src/frames/decode-frame.js';
+import { buildDeviceReadPlan } from '../../src/frames/read-plan.js';
 import {
   buildSimulationValues,
   encodeSimulationRegisters,
   readSimulatedBlock,
-} from '../src/simulation.js';
-import { pm3PhaseProfile } from '../src/profiles/pm-3phase.js';
-import { rc2000Profile } from '../src/profiles/rc-2000.js';
+} from '../../src/simulation.js';
+import { pm3PhaseProfile } from '../../src/profiles/pm-3phase.js';
+import { rc2000Profile } from '../../src/profiles/rc-2000.js';
 
 /** Кадр прибора, прочитанный по плану из регистров с заданными значениями. */
 const frameOf = (profile: DeviceProfile, values: ReadonlyMap<string, DecodedValue>): RawBlock[] => {

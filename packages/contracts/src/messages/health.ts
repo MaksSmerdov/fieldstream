@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isoTimestampSchema } from './primitives.js';
+import { isoTimestampSchema } from '../primitives.js';
 
 export const healthStatusSchema = z.enum(['online', 'degraded', 'offline', 'unknown']);
 export type HealthStatus = z.infer<typeof healthStatusSchema>;

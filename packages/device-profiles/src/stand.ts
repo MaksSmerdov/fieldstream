@@ -1,7 +1,7 @@
 import { standSchema } from '@fieldstream/contracts';
 import type { Stand } from '@fieldstream/contracts';
 import type { z } from 'zod';
-import { profileByKey, profileForDeviceCode } from './catalog.js';
+import { profileByKey, profileForDeviceCode } from './profiles/catalog.js';
 
 /** Стенд до применения умолчаний схемы: то, что пишут руками. */
 export type StandInput = z.input<typeof standSchema>;

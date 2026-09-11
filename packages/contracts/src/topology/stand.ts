@@ -5,7 +5,7 @@ import {
   lineCodeSchema,
   siteCodeSchema,
   slaveIdSchema,
-} from './primitives.js';
+} from '../primitives.js';
 
 export const standSiteSchema = z
   .object({

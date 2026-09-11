@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { telemetryRawSchema, telemetryReadingSchema } from '../telemetry.js';
-import { alarmEventSchema } from '../alarms.js';
-import { deviceStateSchema, pollCycleSchema } from '../events.js';
+import { telemetryRawSchema, telemetryReadingSchema } from '../messages/telemetry.js';
+import { alarmEventSchema } from '../messages/alarms.js';
+import { deviceStateSchema, pollCycleSchema } from '../messages/events.js';
 
 /**
  * Единственное место, где описаны топики. Отсюда генерируются конфиг создания топиков,

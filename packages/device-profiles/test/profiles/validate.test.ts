@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { defineDeviceProfile, validateDeviceProfile } from '../src/validate.js';
-import type { DeviceProfileInput, ProfileIssue } from '../src/validate.js';
-import { rc2000Profile } from '../src/profiles/rc-2000.js';
-import { pm3PhaseProfile } from '../src/profiles/pm-3phase.js';
+import { defineDeviceProfile, validateDeviceProfile } from '../../src/profiles/validate.js';
+import type { DeviceProfileInput, ProfileIssue } from '../../src/profiles/validate.js';
+import { rc2000Profile } from '../../src/profiles/rc-2000.js';
+import { pm3PhaseProfile } from '../../src/profiles/pm-3phase.js';
 
 /** Сырое описание профиля: до схемы, чтобы можно было собрать заведомо кривое. */
 const rawProfile = (sections: unknown[], extra: Record<string, unknown> = {}): unknown => ({
