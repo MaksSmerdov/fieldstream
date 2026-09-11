@@ -7,6 +7,7 @@ export interface BoundedPublisherOptions {
   readonly send: (batch: readonly OutgoingMessage[]) => Promise<void>;
   readonly onDrop: (count: number) => void;
   readonly onError: (error: unknown) => void;
+  readonly now: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
@@ -15,8 +16,14 @@ export interface BoundedPublisher {
   readonly enqueue: (message: OutgoingMessage) => void;
   readonly size: () => number;
   readonly dropped: () => number;
+  readonly oldestAgeMs: () => number;
   readonly drain: () => Promise<void>;
   readonly close: () => void;
+}
+
+interface Pending {
+  readonly message: OutgoingMessage;
+  readonly at: number;
 }
 
 const defaultSleep = (ms: number): Promise<void> =>
@@ -27,11 +34,13 @@ const defaultSleep = (ms: number): Promise<void> =>
 /**
  * Опрос кладёт сообщение и сразу идёт дальше, отправка идёт пачками в фоне. Если брокер недоступен,
  * буфер растёт до ёмкости, а дальше отбрасываются самые старые сообщения: осознанная потеря
- * телеметрии вместо роста памяти до падения процесса.
+ * телеметрии вместо роста памяти до падения процесса. Возраст самого старого неотправленного
+ * сообщения честнее флага подключения говорит, доходят ли данные до брокера.
  */
 export const createBoundedPublisher = (options: BoundedPublisherOptions): BoundedPublisher => {
   const sleep = options.sleep ?? defaultSleep;
-  let queue: OutgoingMessage[] = [];
+  let queue: Pending[] = [];
+  let inFlight: readonly Pending[] = [];
   let dropped = 0;
   let pumping: Promise<void> | null = null;
   let closed = false;
@@ -48,10 +57,13 @@ export const createBoundedPublisher = (options: BoundedPublisherOptions): Bounde
     while (queue.length > 0 && !closed) {
       const batch = queue.slice(0, options.batchSize);
       queue = queue.slice(batch.length);
+      inFlight = batch;
 
       try {
-        await options.send(batch);
+        await options.send(batch.map((pending) => pending.message));
+        inFlight = [];
       } catch (error) {
+        inFlight = [];
         options.onError(error);
         queue = [...batch, ...queue];
         trim();
@@ -70,12 +82,16 @@ export const createBoundedPublisher = (options: BoundedPublisherOptions): Bounde
 
   return {
     enqueue: (message) => {
-      queue.push(message);
+      queue.push({ message, at: options.now() });
       trim();
       kick();
     },
     size: () => queue.length,
     dropped: () => dropped,
+    oldestAgeMs: () => {
+      const oldest = inFlight[0] ?? queue[0];
+      return oldest === undefined ? 0 : Math.max(0, options.now() - oldest.at);
+    },
     drain: async () => {
       while (pumping !== null) await pumping;
     },

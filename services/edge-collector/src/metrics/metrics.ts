@@ -9,6 +9,7 @@ export interface CollectorMetrics {
   readonly observeReconnect: (lineCode: string) => void;
   readonly setOpenBreakers: (lineCode: string, count: number) => void;
   readonly setBuffer: (size: number) => void;
+  readonly setBufferAge: (ageMs: number) => void;
   readonly observeDropped: (count: number) => void;
 }
 
@@ -47,6 +48,11 @@ export const createMetrics = (): CollectorMetrics => {
     help: 'Сообщения, ждущие отправки в Kafka',
     registers: [registry],
   });
+  const bufferAge = new Gauge({
+    name: 'fieldstream_collector_buffer_oldest_age_seconds',
+    help: 'Возраст самого старого сообщения, ещё не принятого брокером',
+    registers: [registry],
+  });
   const dropped = new Counter({
     name: 'fieldstream_collector_buffer_dropped_total',
     help: 'Сообщения, отброшенные при переполнении буфера',
@@ -69,6 +75,9 @@ export const createMetrics = (): CollectorMetrics => {
     },
     setBuffer: (size) => {
       buffer.set(size);
+    },
+    setBufferAge: (ageMs) => {
+      bufferAge.set(ageMs / 1000);
     },
     observeDropped: (count) => {
       dropped.inc(count);
