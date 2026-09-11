@@ -17,6 +17,10 @@ const PROFILE_BY_DEVICE_CODE = new Map<string, DeviceProfile>([
 export const profileByKey = (key: string): DeviceProfile | undefined =>
   DEVICE_PROFILES.find((profile) => profile.profileKey === key);
 
+/** Профиль строго той версии, которой прочитан кадр: другая версия могла разбирать слова иначе. */
+export const profileByVersion = (key: string, version: number): DeviceProfile | undefined =>
+  DEVICE_PROFILES.find((profile) => profile.profileKey === key && profile.version === version);
+
 /** Профиль, который обслуживает прибор с этим кодом. */
 export const profileForDeviceCode = (code: string): DeviceProfile | undefined =>
   PROFILE_BY_DEVICE_CODE.get(code);
