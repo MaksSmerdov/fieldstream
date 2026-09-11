@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev build:watch",
     "typecheck": "tsc --noEmit -p tsconfig.eslint.json",
     "test": "turbo run test",
     "lint": "eslint . --max-warnings=0",

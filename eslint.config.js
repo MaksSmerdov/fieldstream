@@ -28,6 +28,7 @@ export default tseslint.config(
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
       'no-console': 'error',
       'no-restricted-syntax': ['error', noWallClock, noBareNewDate],
     },
