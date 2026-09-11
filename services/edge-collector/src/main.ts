@@ -6,11 +6,11 @@ import { TOPICS } from '@fieldstream/contracts';
 import { SystemClock } from '@fieldstream/domain';
 import { AppModule } from './app.module.js';
 import { loadEnv } from './config/env.js';
-import { NestPinoLogger, createLogger } from './logging/logger.js';
+import { NestPinoLogger, createLogger } from '@fieldstream/nest-common';
 import { createMetrics } from './metrics/metrics.js';
 
 const env = loadEnv(process.env);
-const log = createLogger(env.LOG_LEVEL);
+const log = createLogger('edge-collector', env.LOG_LEVEL);
 
 const app = await NestFactory.create<NestFastifyApplication>(
   AppModule.register({ env, log, clock: SystemClock, metrics: createMetrics() }),

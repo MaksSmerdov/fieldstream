@@ -6,7 +6,7 @@ import { DEMO_STAND } from '@fieldstream/device-profiles';
 import type { PlanMode } from '@fieldstream/device-profiles';
 import type { Clock } from '@fieldstream/domain';
 import type { Env } from '../config/env.js';
-import type { Logger } from '../logging/logger.js';
+import type { Logger } from '@fieldstream/nest-common';
 import type { CollectorMetrics } from '../metrics/metrics.js';
 import { createLineWorker } from '../polling/line-worker.js';
 import type { LineSnapshot, LineWorker } from '../polling/line-worker.js';

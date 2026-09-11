@@ -13,6 +13,7 @@
     { "path": "../../packages/contracts" },
     { "path": "../../packages/device-profiles" },
     { "path": "../../packages/domain" },
-    { "path": "../../packages/kafka" }
+    { "path": "../../packages/kafka" },
+    { "path": "../../packages/nest-common" }
   ]
 }

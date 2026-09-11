@@ -159,6 +159,25 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
 
+  packages/nest-common:
+    dependencies:
+      '@fieldstream/domain':
+        specifier: workspace:*
+        version: link:../domain
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.2
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
+
   services/device-sim:
     dependencies:
       '@fieldstream/contracts':
@@ -210,6 +229,9 @@ importers:
       '@fieldstream/kafka':
         specifier: workspace:*
         version: link:../../packages/kafka
+      '@fieldstream/nest-common':
+        specifier: workspace:*
+        version: link:../../packages/nest-common
       '@nestjs/common':
         specifier: ^12.0.1
         version: 12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
