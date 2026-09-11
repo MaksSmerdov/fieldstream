@@ -16,6 +16,8 @@ export interface TopicSpec<S extends z.ZodTypeAny> {
   readonly partitions: number;
   readonly cleanupPolicy: 'delete' | 'compact';
   readonly retentionMs: number | null;
+  /** Настройки топика сверх политики очистки и срока хранения. */
+  readonly configs?: Readonly<Record<string, string>>;
   /** Сервис, которому разрешено писать в топик. Двух писателей быть не должно. */
   readonly owner: string;
   readonly why: string;
@@ -33,6 +35,7 @@ export const TOPICS = {
     partitions: 6,
     cleanupPolicy: 'delete',
     retentionMs: 7 * DAY_MS,
+    configs: { 'compression.type': 'lz4' },
     owner: 'edge-collector',
     why: 'Семь дней это окно реплея: сырые кадры позволяют переиграть историю исправленным декодером.',
   }),
@@ -63,8 +66,16 @@ export const TOPICS = {
     partitions: 3,
     cleanupPolicy: 'compact',
     retentionMs: null,
+    configs: {
+      'min.cleanable.dirty.ratio': '0.1',
+      'segment.ms': '60000',
+      'delete.retention.ms': '3600000',
+      'max.compaction.lag.ms': '300000',
+    },
     owner: 'stream-processor',
-    why: 'Компактируемый топик хранит последнее состояние прибора, ключ это идентификатор узла.',
+    why:
+      'Компактируемый топик хранит последнее состояние прибора, ключ это идентификатор узла. ' +
+      'Сегменты по минуте выставлены под демо: компакция срабатывает за минуты, а не за сутки.',
   }),
   alarmEvents: define({
     name: 'fieldstream.alarms.events.v1',

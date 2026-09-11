@@ -11,6 +11,7 @@ interface TopicShape {
   readonly partitions: number;
   readonly cleanupPolicy: 'delete' | 'compact';
   readonly retentionMs: number | null;
+  readonly configs?: Readonly<Record<string, string>>;
   readonly owner: string;
   readonly why: string;
 }
@@ -134,6 +135,17 @@ describe('манифест топиков', () => {
 
     expect(compactedWithRetention).toEqual([]);
     expect(deletedWithoutRetention).toEqual([]);
+  });
+
+  it('настройки топика не переопределяют политику очистки и срок хранения', () => {
+    const clashing = SPECS.filter((spec) =>
+      Object.keys(spec.configs ?? {}).some(
+        (key) => key === 'cleanup.policy' || key === 'retention.ms',
+      ),
+    ).map((spec) => spec.name);
+
+    expect(clashing).toEqual([]);
+    expect(TOPICS.telemetryRaw.configs).toEqual({ 'compression.type': 'lz4' });
   });
 
   it('число партиций положительное целое', () => {
