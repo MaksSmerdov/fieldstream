@@ -81,8 +81,8 @@ export const groupByTopic = (messages: readonly OutgoingMessage[]): TopicMessage
 };
 
 /**
- * Отправка пачки. Сжатие на стороне брокера: у топика сырых кадров compression.type=lz4,
- * а кодек LZ4 для kafkajs тянет нативную сборку, которой нет смысла платить за это.
+ * Отправка пачки. Сжатие делает брокер по настройке топика, и выбран gzip: его kafkajs
+ * распаковывает сам, а для LZ4 потребителям понадобился бы сторонний кодек.
  */
 export const sendMessages = async (
   producer: Producer,

@@ -146,7 +146,7 @@ describe('манифест топиков', () => {
     ).map((spec) => spec.name);
 
     expect(clashing).toEqual([]);
-    expect(TOPICS.telemetryRaw.configs).toEqual({ 'compression.type': 'lz4' });
+    expect(TOPICS.telemetryRaw.configs).toEqual({ 'compression.type': 'gzip' });
   });
 
   it('число партиций положительное целое', () => {

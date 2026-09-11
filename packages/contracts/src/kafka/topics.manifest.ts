@@ -41,7 +41,7 @@ export const TOPICS = {
     partitions: 6,
     cleanupPolicy: 'delete',
     retentionMs: 7 * DAY_MS,
-    configs: { 'compression.type': 'lz4' },
+    configs: { 'compression.type': 'gzip' },
     owner: 'edge-collector',
     why: 'Семь дней это окно реплея: сырые кадры позволяют переиграть историю исправленным декодером.',
   }),
