@@ -12,7 +12,8 @@
     "dev": "node --watch-path=dist --env-file-if-exists=../../.env dist/main.js",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@fieldstream/contracts": "workspace:*",
@@ -34,8 +35,10 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "^12.1.0",
     "@types/node": "^22.9.0",
     "@types/pg": "^8.23.1",
+    "testcontainers": "^12.1.0",
     "typescript": "^5.6.3",
     "vitest": "^4.1.11"
   }

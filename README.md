@@ -83,7 +83,7 @@ docs/ARCHITECTURE.md  полный инженерный план проекта
 pnpm install
 pnpm build            # turbo, сборка всех пакетов
 pnpm test             # vitest по пакетам, включая проверку границ зависимостей
-pnpm test:integration # миграции и запись на настоящей TimescaleDB в контейнере, нужен Docker
+pnpm test:integration # база и процессор на настоящих TimescaleDB и Kafka в контейнерах, нужен Docker
 pnpm typecheck        # типы, включая тестовые файлы
 pnpm lint             # eslint, включая тестовые файлы
 pnpm format:check     # prettier
