@@ -13,7 +13,13 @@ import {
 import type { DeviceEventRow, DlqRow, ReadingRow } from '@fieldstream/db';
 import { toIsoTimestamp } from '@fieldstream/domain';
 import type { Clock, SpikeFilterState } from '@fieldstream/domain';
-import { createConsumer, decodeMessage, headerText, toDlqMessage } from '@fieldstream/kafka';
+import {
+  commitThrough,
+  createConsumer,
+  decodeMessage,
+  headerText,
+  toDlqMessage,
+} from '@fieldstream/kafka';
 import type { RawOutgoingMessage } from '@fieldstream/kafka';
 import type { Logger } from '@fieldstream/nest-common';
 import { HealthService } from '../health/health.service.js';
@@ -226,8 +232,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
 
     this.attempts.delete(batch.partition);
     this.filters = filters;
-    payload.resolveOffset(lastOffset);
-    await payload.commitOffsetsIfNecessary();
+    await commitThrough(payload, lastOffset);
     await payload.heartbeat();
     this.metrics.observeBatch(batch.topic, this.clock.now() - startedAt);
   }

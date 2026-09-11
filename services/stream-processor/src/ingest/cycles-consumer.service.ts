@@ -7,7 +7,7 @@ import type { PollCycle } from '@fieldstream/contracts';
 import { insertPollCycles, withTransaction } from '@fieldstream/db';
 import type { PollCycleRow } from '@fieldstream/db';
 import type { Clock } from '@fieldstream/domain';
-import { createConsumer, decodeMessage } from '@fieldstream/kafka';
+import { commitThrough, createConsumer, decodeMessage } from '@fieldstream/kafka';
 import { createLogThrottle } from '@fieldstream/nest-common';
 import type { Logger } from '@fieldstream/nest-common';
 import { HealthService } from '../health/health.service.js';
@@ -122,8 +122,7 @@ export class CyclesConsumerService implements OnApplicationBootstrap, BeforeAppl
     }
 
     for (const cycle of cycles) this.health.observeCycle(cycle);
-    payload.resolveOffset(lastOffset);
-    await payload.commitOffsetsIfNecessary();
+    await commitThrough(payload, lastOffset);
     await payload.heartbeat();
   }
 }

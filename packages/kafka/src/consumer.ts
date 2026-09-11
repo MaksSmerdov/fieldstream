@@ -1,6 +1,6 @@
 import { ZodError } from 'zod';
 import type { z } from 'zod';
-import type { Consumer, ConsumerConfig, IHeaders, Kafka } from 'kafkajs';
+import type { Consumer, ConsumerConfig, EachBatchPayload, IHeaders, Kafka } from 'kafkajs';
 import { KAFKA_HEADERS } from '@fieldstream/contracts';
 import type { TopicSpec } from '@fieldstream/contracts';
 
@@ -18,6 +18,25 @@ export const CONSUMER_CONFIG: Omit<ConsumerConfig, 'groupId'> = Object.freeze({
 /** Потребитель группы с настройками проекта. */
 export const createConsumer = (kafka: Kafka, groupId: string): Consumer =>
   kafka.consumer({ ...CONSUMER_CONFIG, groupId });
+
+/**
+ * Подтверждение пачки по offset включительно. При autoCommit: false вызов
+ * commitOffsetsIfNecessary() без аргументов в kafkajs не коммитит ничего, поэтому позиция
+ * передаётся явно, и это следующее смещение для чтения, а не последнее прочитанное.
+ */
+export const commitThrough = async (payload: EachBatchPayload, offset: string): Promise<void> => {
+  payload.resolveOffset(offset);
+  await payload.commitOffsetsIfNecessary({
+    topics: [
+      {
+        topic: payload.batch.topic,
+        partitions: [
+          { partition: payload.batch.partition, offset: (BigInt(offset) + 1n).toString() },
+        ],
+      },
+    ],
+  });
+};
 
 /** Значение заголовка строкой. */
 export const headerText = (headers: IHeaders | undefined, name: string): string | null => {

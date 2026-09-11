@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { EachBatchPayload, Offsets } from 'kafkajs';
 import { KAFKA_HEADERS, TOPICS } from '@fieldstream/contracts';
-import { decodeMessage, headerText, topicMajor } from './consumer.js';
+import { commitThrough, decodeMessage, headerText, topicMajor } from './consumer.js';
 
 const RAW = {
   schema: 'telemetry.raw',
@@ -67,5 +68,36 @@ describe('вспомогательное', () => {
   it('мажорная версия схемы берётся из имени топика', () => {
     expect(topicMajor('fieldstream.telemetry.raw.v1')).toBe(1);
     expect(topicMajor('fieldstream.telemetry.raw.v12')).toBe(12);
+  });
+});
+
+describe('подтверждение пачки', () => {
+  it('коммитит явно и следующую позицию чтения, а не последнее прочитанное смещение', async () => {
+    const resolved: string[] = [];
+    const committed: (Offsets | undefined)[] = [];
+    const payload = {
+      batch: { topic: 'fieldstream.telemetry.raw.v1', partition: 4 },
+      resolveOffset: (offset: string) => {
+        resolved.push(offset);
+      },
+      commitOffsetsIfNecessary: (offsets?: Offsets) => {
+        committed.push(offsets);
+        return Promise.resolve();
+      },
+    } as unknown as EachBatchPayload;
+
+    await commitThrough(payload, '9007199254740993');
+
+    expect(resolved).toEqual(['9007199254740993']);
+    expect(committed).toEqual([
+      {
+        topics: [
+          {
+            topic: 'fieldstream.telemetry.raw.v1',
+            partitions: [{ partition: 4, offset: '9007199254740994' }],
+          },
+        ],
+      },
+    ]);
   });
 });
