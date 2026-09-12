@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
+import { AppSession } from './app/AppSession.js';
 import { ErrorBoundary } from './app/ErrorBoundary.js';
 import { Providers } from './app/Providers.js';
 import { router } from './app/router.js';
@@ -12,7 +13,9 @@ createRoot(container).render(
   <StrictMode>
     <ErrorBoundary>
       <Providers>
-        <RouterProvider router={router} />
+        <AppSession>
+          <RouterProvider router={router} />
+        </AppSession>
       </Providers>
     </ErrorBoundary>
   </StrictMode>,

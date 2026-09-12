@@ -1,0 +1,59 @@
+.boot {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--mui-palette-divider);
+  border-radius: 12px;
+  background: var(--mui-palette-background-paper);
+
+  &__stages {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__stage {
+    display: grid;
+    gap: 4px 10px;
+    align-items: baseline;
+    grid-template-columns: 20px minmax(120px, auto) 1fr;
+    color: var(--mui-palette-text-secondary);
+
+    &_done {
+      color: var(--mui-palette-success-main);
+    }
+
+    &_failed {
+      color: var(--mui-palette-error-main);
+    }
+  }
+
+  &__mark {
+    text-align: center;
+  }
+
+  &__title {
+    color: var(--mui-palette-text-primary);
+  }
+
+  &__detail {
+    color: var(--mui-palette-text-secondary);
+    font-size: 13px;
+  }
+
+  &__progress {
+    margin-top: 4px;
+  }
+
+  @media (max-width: 600px) {
+    &__stage {
+      grid-template-columns: 20px 1fr;
+    }
+
+    &__detail {
+      grid-column: 2;
+    }
+  }
+}
