@@ -5,6 +5,7 @@ import type { ModuleId, Role } from '@fieldstream/contracts';
 /** Разбор токена доступа: тому, кто пришёл с ним, больше ничего доказывать не нужно. */
 export interface AccessClaims {
   readonly userId: string;
+  readonly email: string;
   readonly sessionId: string;
   readonly role: Role;
   readonly permissions: readonly ModuleId[];
@@ -34,7 +35,11 @@ export const issueAccessToken = async (
   ttlMs: number,
 ): Promise<IssuedAccess> => {
   const expiresAtMs = nowMs + ttlMs;
-  const token = await new SignJWT({ role: claims.role, permissions: [...claims.permissions] })
+  const token = await new SignJWT({
+    email: claims.email,
+    role: claims.role,
+    permissions: [...claims.permissions],
+  })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(claims.userId)
     .setJti(claims.sessionId)
@@ -57,12 +62,15 @@ export const verifyAccessToken = async (
       currentDate: new Date(nowMs),
     });
     const role = payload['role'];
+    const email = payload['email'];
     const permissions = payload['permissions'];
     if (typeof payload.sub !== 'string' || typeof payload.jti !== 'string') return null;
-    if (typeof role !== 'string' || !Array.isArray(permissions)) return null;
+    if (typeof role !== 'string' || typeof email !== 'string') return null;
+    if (!Array.isArray(permissions)) return null;
 
     return {
       userId: payload.sub,
+      email,
       sessionId: payload.jti,
       role: role as Role,
       permissions: permissions.filter((item): item is ModuleId => typeof item === 'string'),

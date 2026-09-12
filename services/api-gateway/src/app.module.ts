@@ -14,6 +14,7 @@ import { LiveBusService } from './events/live-bus.service.js';
 import { HealthController } from './http/health.controller.js';
 import { MetricsController } from './http/metrics.controller.js';
 import type { GatewayMetrics } from './metrics/metrics.js';
+import { AlarmsController } from './read/alarms.controller.js';
 import { DevicesController } from './read/devices.controller.js';
 import { TopologyController } from './read/topology.controller.js';
 import { CLOCK, ENV, INSTANCE_ID, LOGGER, METRICS, POOL } from './tokens.js';
@@ -41,6 +42,7 @@ export class AppModule {
         MeController,
         TopologyController,
         DevicesController,
+        AlarmsController,
       ],
       providers: [
         { provide: ENV, useValue: deps.env },

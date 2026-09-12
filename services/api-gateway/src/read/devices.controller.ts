@@ -1,20 +1,39 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Inject,
   NotFoundException,
   Param,
+  Put,
   Query,
 } from '@nestjs/common';
 import type pg from 'pg';
-import { pickSource, planModeSchema, seriesQuerySchema } from '@fieldstream/contracts';
-import type { DeviceSnapshot, ReadPlanResponse, SeriesResponse } from '@fieldstream/contracts';
-import { loadDeviceSnapshot, loadSeries } from '@fieldstream/db';
+import {
+  alarmRulesUpdateSchema,
+  pickSource,
+  planModeSchema,
+  seriesQuerySchema,
+} from '@fieldstream/contracts';
+import type {
+  AlarmRulesResponse,
+  AlarmRulesUpdateResponse,
+  DeviceSnapshot,
+  ReadPlanResponse,
+  SeriesResponse,
+} from '@fieldstream/contracts';
+import {
+  loadDeviceAlarmRules,
+  loadDeviceSnapshot,
+  loadSeries,
+  updateDeviceAlarmRules,
+} from '@fieldstream/db';
 import { buildDeviceReadPlan, profileByVersion } from '@fieldstream/device-profiles';
 import { toIsoTimestamp } from '@fieldstream/domain';
 import type { Clock } from '@fieldstream/domain';
-import { RequirePermission } from '../auth/auth.guard.js';
+import { CurrentUser, RequirePermission } from '../auth/auth.guard.js';
+import type { AccessClaims } from '../auth/tokens.js';
 import { withClient } from '../common/with-client.js';
 import { CLOCK, POOL } from '../tokens.js';
 
@@ -89,6 +108,49 @@ export class DevicesController {
         to: parsed.data.to,
       },
     };
+  }
+
+  /** Уставки прибора по режимам: в оттайке границы свои, и это видно прямо в списке. */
+  @Get(':code/alarm-rules')
+  @RequirePermission('devices')
+  public async alarmRules(@Param('code') code: string): Promise<AlarmRulesResponse> {
+    const rules = await withClient(this.pool, (client) => loadDeviceAlarmRules(client, code));
+    if (rules.length === 0) {
+      const snapshot = await withClient(this.pool, (client) => loadDeviceSnapshot(client, code));
+      if (snapshot === null) throw new NotFoundException(`прибора ${code} нет в топологии`);
+    }
+
+    return { deviceCode: code, rules };
+  }
+
+  /**
+   * Правка уставок. Уставка и запись в историю правок идут одной транзакцией, поэтому
+   * изменение без следа невозможно. Через несколько секунд новые значения подхватит процессор.
+   */
+  @Put(':code/alarm-rules')
+  @RequirePermission('alarm-rules.edit')
+  public async updateAlarmRules(
+    @Param('code') code: string,
+    @Body() body: unknown,
+    @CurrentUser() claims: AccessClaims,
+  ): Promise<AlarmRulesUpdateResponse> {
+    const parsed = alarmRulesUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.issues.map((issue) => issue.message));
+    }
+
+    const result = await withClient(this.pool, (client) =>
+      updateDeviceAlarmRules(
+        client,
+        code,
+        parsed.data.rules,
+        claims.email,
+        toIsoTimestamp(this.clock.now()),
+      ),
+    );
+    if (result === null) throw new NotFoundException(`прибора ${code} нет в топологии`);
+
+    return { deviceCode: code, changes: result.changes, rules: result.rules };
   }
 
   /** Карта регистров: тот же план, что уходит на линию, в склеенном или поштучном виде. */

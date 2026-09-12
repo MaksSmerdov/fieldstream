@@ -220,7 +220,13 @@ export class AuthService {
     const sessionUser = toSessionUser(user);
     const access = await issueAccessToken(
       this.keys,
-      { userId: user.id, sessionId, role: user.role, permissions: sessionUser.permissions },
+      {
+        userId: user.id,
+        email: user.email,
+        sessionId,
+        role: user.role,
+        permissions: sessionUser.permissions,
+      },
       this.clock.now(),
       this.env.ACCESS_TTL_MS,
     );

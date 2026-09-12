@@ -21,6 +21,7 @@ beforeAll(async () => {
     deriveKeys(SECRET),
     {
       userId: 'ba0ba102-a143-4f6c-8538-47bded9939fb',
+      email: 'engineer@fieldstream.local',
       sessionId: 'сессия',
       role: 'engineer',
       permissions: ['overview'],

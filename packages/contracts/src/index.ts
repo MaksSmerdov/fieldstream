@@ -8,6 +8,7 @@ export * from './kafka/topics.manifest.js';
 export * from './series.js';
 export * from './auth/permissions.js';
 export * from './auth/dto.js';
+export * from './api/alarms.js';
 export * from './api/read.js';
 export * from './topology/stand.js';
 export * from './topology/sim.js';
