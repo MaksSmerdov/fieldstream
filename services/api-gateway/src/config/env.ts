@@ -24,6 +24,20 @@ const envSchema = z.object({
   /** Экземпляр шлюза: входит в группу потребителей и в идентификаторы событий. */
   GATEWAY_INSTANCE_ID: z.string().min(1).optional(),
   CORS_ORIGINS: list.default('http://localhost:5173'),
+  /** Из одного секрета выводятся ключ подписи токена доступа и перец для хеша токена обновления. */
+  AUTH_SECRET: z.string().min(32, 'секрет обязателен и не короче 32 символов'),
+  ACCESS_TTL_MS: z.coerce.number().int().min(60_000).max(3_600_000).default(600_000),
+  REFRESH_TTL_MS: z.coerce.number().int().min(3_600_000).default(2_592_000_000),
+  /** Окно повтора: ответ на обновление мог потеряться по дороге, это не повод разлогинивать. */
+  REFRESH_REUSE_WINDOW_MS: z.coerce.number().int().min(1_000).max(600_000).default(60_000),
+  LOGIN_ATTEMPTS: z.coerce.number().int().min(1).max(100).default(10),
+  /** Ведро адреса шире ведра почты: за одним адресом может сидеть целая площадка. */
+  LOGIN_IP_ATTEMPTS: z.coerce.number().int().min(1).max(1_000).default(50),
+  LOGIN_REFILL_MS: z.coerce.number().int().min(1_000).default(30_000),
+  COOKIE_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   SSE_PING_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
   SSE_RING_SIZE: z.coerce.number().int().min(100).max(50_000).default(5_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),

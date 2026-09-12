@@ -1,5 +1,6 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
 import type pg from 'pg';
+import { Public } from '../auth/auth.guard.js';
 import { LiveBusService } from '../events/live-bus.service.js';
 import { POOL } from '../tokens.js';
 
@@ -10,6 +11,7 @@ interface Readiness {
 }
 
 /** Живость и готовность. Готов, когда база отвечает: без неё шлюзу нечего отдавать. */
+@Public()
 @Controller('health')
 export class HealthController {
   public constructor(

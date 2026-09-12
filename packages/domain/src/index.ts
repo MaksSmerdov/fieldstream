@@ -1,6 +1,7 @@
 export * from './clock.js';
 export * from './alarms.js';
 export * from './alarm-key.js';
+export * from './password.js';
 export * from './health.js';
 export * from './filters.js';
 export * from './events.js';

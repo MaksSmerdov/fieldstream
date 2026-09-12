@@ -2,5 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "outDir": "./dist", "rootDir": "./src", "types": ["node"] },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../contracts" }, { "path": "../device-profiles" }]
+  "references": [
+    { "path": "../contracts" },
+    { "path": "../device-profiles" },
+    { "path": "../domain" }
+  ]
 }

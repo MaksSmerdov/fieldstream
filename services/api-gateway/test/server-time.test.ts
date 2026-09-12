@@ -3,19 +3,35 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createFakeClock, toIsoTimestamp } from '@fieldstream/domain';
 import { createLogger } from '@fieldstream/nest-common';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { deriveKeys, issueAccessToken } from '../src/auth/tokens.js';
 import { createApp } from '../src/bootstrap.js';
 import { loadEnv } from '../src/config/env.js';
 import { createMetrics } from '../src/metrics/metrics.js';
 
+const SECRET = 'секрет стенда длиной не меньше тридцати двух символов';
 const clock = createFakeClock(1_760_000_000_000);
 const pool = { query: () => Promise.resolve({ rows: [] }) } as unknown as pg.Pool;
 
 let app: NestFastifyApplication;
 let base: string;
+let accessToken: string;
 
 beforeAll(async () => {
+  const issued = await issueAccessToken(
+    deriveKeys(SECRET),
+    {
+      userId: 'ba0ba102-a143-4f6c-8538-47bded9939fb',
+      sessionId: 'сессия',
+      role: 'engineer',
+      permissions: ['overview'],
+    },
+    clock.now(),
+    600_000,
+  );
+  accessToken = issued.token;
+
   app = await createApp({
-    env: loadEnv({ FS_API_PASSWORD: 'тест', SSE_PING_MS: '1000' }),
+    env: loadEnv({ FS_API_PASSWORD: 'тест', SSE_PING_MS: '1000', AUTH_SECRET: SECRET }),
     log: createLogger('api-gateway', 'fatal'),
     clock,
     metrics: createMetrics(),
@@ -44,7 +60,9 @@ describe('шлюз отдаёт серверное время', () => {
    */
   it('в живом канале, где заголовки уходят до первого события', async () => {
     const abort = new AbortController();
-    const response = await fetch(`${base}/api/events`, { signal: abort.signal });
+    const response = await fetch(`${base}/api/events?access_token=${accessToken}`, {
+      signal: abort.signal,
+    });
 
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     expect(response.headers.get('x-accel-buffering')).toBe('no');
@@ -61,5 +79,11 @@ describe('шлюз отдаёт серверное время', () => {
     expect((await fetch(`${base}/metrics`)).status).toBe(200);
     expect((await fetch(`${base}/api/metrics`)).status).toBe(404);
     expect((await fetch(`${base}/events`)).status).toBe(404);
+  });
+
+  /** EventSource не умеет ставить заголовки, поэтому живой канал принимает токен и строкой запроса. */
+  it('живой канал без токена не отдаётся', async () => {
+    expect((await fetch(`${base}/api/events`)).status).toBe(401);
+    expect((await fetch(`${base}/api/events?access_token=подделка`)).status).toBe(401);
   });
 });

@@ -6,6 +6,8 @@ import { runMigrations } from './setup/migrate.js';
 import { ROLES, bootstrapDatabase } from './setup/roles.js';
 import { syncAlarmRules } from './store/alarms.js';
 import { syncTopology } from './store/topology.js';
+import { seedDemoUsers } from './store/users.js';
+import type { DemoUser } from './store/users.js';
 
 const secret = z.string().min(1, 'пароль обязателен, значения по умолчанию нет');
 
@@ -19,7 +21,15 @@ const envSchema = z.object({
   FS_INGEST_PASSWORD: secret,
   FS_API_PASSWORD: secret,
   MIGRATE_DIRECTION: z.enum(['up', 'down']).default('up'),
+  DEMO_PASSWORD: z.string().min(8).default('fieldstream'),
 });
+
+/** Учётные записи стенда: по одной на роль, чтобы разницу прав было видно сразу. */
+const demoUsers = (password: string): DemoUser[] => [
+  { email: 'viewer@fieldstream.local', displayName: 'Наблюдатель', role: 'viewer', password },
+  { email: 'engineer@fieldstream.local', displayName: 'Инженер', role: 'engineer', password },
+  { email: 'admin@fieldstream.local', displayName: 'Администратор', role: 'admin', password },
+];
 
 /** Строка лога в JSON: у одноразового контейнера нет смысла тянуть логгер сервиса. */
 const say = (message: string, fields: Record<string, unknown> = {}): void => {
@@ -68,6 +78,13 @@ if (env.MIGRATE_DIRECTION === 'up') {
 
     const rules = await syncAlarmRules(owner, DEFAULT_ALARM_RULES);
     say('стартовые уставки на месте', { added: rules });
+
+    const users = demoUsers(env.DEMO_PASSWORD);
+    const created = await seedDemoUsers(owner, users);
+    say('учётные записи стенда на месте', {
+      created,
+      accounts: users.map((user) => `${user.email} (${user.role})`),
+    });
   } finally {
     await owner.end();
   }

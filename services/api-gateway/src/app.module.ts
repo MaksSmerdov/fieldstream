@@ -1,8 +1,13 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import type pg from 'pg';
 import type { Clock } from '@fieldstream/domain';
 import type { Logger } from '@fieldstream/nest-common';
+import { AuthController } from './auth/auth.controller.js';
+import { AuthGuard } from './auth/auth.guard.js';
+import { AuthService } from './auth/auth.service.js';
+import { MeController } from './auth/me.controller.js';
 import type { Env } from './config/env.js';
 import { EventsController } from './events/events.controller.js';
 import { LiveBusService } from './events/live-bus.service.js';
@@ -26,7 +31,13 @@ export class AppModule {
   public static register(deps: AppDeps): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, MetricsController, EventsController],
+      controllers: [
+        HealthController,
+        MetricsController,
+        EventsController,
+        AuthController,
+        MeController,
+      ],
       providers: [
         { provide: ENV, useValue: deps.env },
         { provide: LOGGER, useValue: deps.log },
@@ -34,6 +45,8 @@ export class AppModule {
         { provide: METRICS, useValue: deps.metrics },
         { provide: POOL, useValue: deps.pool },
         { provide: INSTANCE_ID, useValue: deps.instanceId },
+        { provide: APP_GUARD, useClass: AuthGuard },
+        AuthService,
         LiveBusService,
       ],
     };

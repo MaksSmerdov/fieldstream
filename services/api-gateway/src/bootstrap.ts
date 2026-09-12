@@ -1,3 +1,4 @@
+import fastifyCookie from '@fastify/cookie';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -19,6 +20,8 @@ export const createApp = async (deps: AppDeps): Promise<NestFastifyApplication> 
     new FastifyAdapter(),
     { logger: new NestPinoLogger(deps.log) },
   );
+
+  await app.register(fastifyCookie);
 
   const fastify = app.getHttpAdapter().getInstance();
   registerServerTime(fastify, deps.clock);
