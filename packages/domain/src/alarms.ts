@@ -22,6 +22,12 @@ export type MetricAlarmState =
       severity: Severity;
       threshold: number;
       raisedAt: number;
+      /**
+       * Режим, в котором аларм подняли. Часть ключа эпизода, поэтому снятие обязано назвать
+       * именно его: прибор к этому моменту может быть уже в другом режиме, и подставленный
+       * текущий режим дал бы другой ключ, а эпизод остался бы незакрытым навсегда.
+       */
+      mode: DeviceMode;
     };
 
 /** Состояние алармов прибора. Ключ это metricKey. */
@@ -95,7 +101,7 @@ const clearedTransition = (
 ): AlarmTransition => ({
   deviceCode: input.deviceCode,
   metricKey,
-  mode: input.mode,
+  mode: prev.mode,
   state: 'cleared',
   severity: prev.severity,
   value,
@@ -203,6 +209,7 @@ export const evaluateDeviceAlarms = (input: EvaluateDeviceAlarmsInput): DeviceAl
       severity: rule.severity,
       threshold: violation.threshold,
       raisedAt: input.nowMs,
+      mode: input.mode,
     };
   }
 

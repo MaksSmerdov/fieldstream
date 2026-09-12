@@ -77,11 +77,14 @@ const rc2000Rules: readonly ProfileAlarmRule[] = [
     severity: 'warning',
     enabled: true,
   },
+  // Змеевик в оттайке греется до +10 по устройству прибора: граница ниже этого числа
+  // означала бы аларм на каждой штатной оттайке, а лента из ложных срабатываний хуже
+  // отсутствующей. За +12 остаётся застрявший нагреватель, ради которого уставка и нужна
   {
     metricKey: 'evap_temp_c',
     mode: 'defrost',
     minValue: -28,
-    maxValue: 8,
+    maxValue: 12,
     hysteresis: 1,
     debounceCycles: 6,
     severity: 'info',

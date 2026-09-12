@@ -148,3 +148,46 @@ export const clearAlarmEvents = async (
   );
   return result.rowCount ?? 0;
 };
+
+export interface OpenAlarmEpisode {
+  readonly deviceCode: string;
+  readonly metricKey: string;
+  readonly mode: DeviceMode;
+  readonly boundary: 'min' | 'max';
+  readonly severity: Severity;
+  readonly threshold: number | null;
+  readonly raisedAtMs: number;
+}
+
+/**
+ * Незакрытые эпизоды из базы. Нужны процессору при запуске: состояние алармов живёт в памяти,
+ * и без восстановления перезапуск оставил бы открытые эпизоды сиротами, а счётчик активных
+ * алармов на экране врал бы до тех пор, пока их не закроют руками.
+ */
+export const loadOpenAlarmEpisodes = async (client: pg.ClientBase): Promise<OpenAlarmEpisode[]> => {
+  const result = await client.query<{
+    device_code: string;
+    metric_key: string;
+    mode: DeviceMode;
+    boundary: 'min' | 'max';
+    severity: Severity;
+    threshold: number | null;
+    occurred_at: Date;
+  }>(
+    `SELECT d.code AS device_code, e.metric_key, e.mode, e.boundary, e.severity,
+            e.threshold, e.occurred_at
+     FROM core.alarm_events e JOIN core.devices d ON d.id = e.device_id
+     WHERE e.cleared_at IS NULL
+     ORDER BY e.occurred_at`,
+  );
+
+  return result.rows.map((row) => ({
+    deviceCode: row.device_code,
+    metricKey: row.metric_key,
+    mode: row.mode,
+    boundary: row.boundary,
+    severity: row.severity,
+    threshold: row.threshold,
+    raisedAtMs: row.occurred_at.getTime(),
+  }));
+};

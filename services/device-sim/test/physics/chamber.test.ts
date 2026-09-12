@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { listPlanEntries, rc2000Profile } from '@fieldstream/device-profiles';
+import { DEFAULT_ALARM_RULES, listPlanEntries, rc2000Profile } from '@fieldstream/device-profiles';
 import {
   CHAMBER,
   chamberValues,
@@ -80,6 +80,36 @@ describe('модель камеры', () => {
     expect(
       trace.filter((state) => state.defrost === 'heating' && state.compressor === 'running'),
     ).toEqual([]);
+  });
+
+  /**
+   * Уставки стенда обязаны знать про физику прибора: змеевик в оттайке греется намеренно,
+   * и граница ниже этой температуры дала бы аларм на каждой штатной оттайке. Лента из ложных
+   * срабатываний хуже отсутствующей, поэтому проверяется это моделью, а не глазами.
+   */
+  it('штатная оттайка укладывается в уставки стенда для режима оттайки', () => {
+    const rules = (DEFAULT_ALARM_RULES[rc2000Profile.profileKey] ?? []).filter(
+      (rule) => rule.mode === 'defrost',
+    );
+    expect(rules.length).toBeGreaterThan(0);
+
+    const trace = run(
+      startDefrost(settled()),
+      NIGHT,
+      CHAMBER.heatingSec + CHAMBER.drainingSec + 60,
+    );
+
+    for (const rule of rules) {
+      const values = trace
+        .map((state) => chamberValues(state).get(rule.metricKey))
+        .filter((value): value is number => typeof value === 'number');
+      expect(values.length).toBeGreaterThan(0);
+
+      const peak = Math.max(...values);
+      const bottom = Math.min(...values);
+      expect(rule.maxValue === null || peak <= rule.maxValue).toBe(true);
+      expect(rule.minValue === null || bottom >= rule.minValue).toBe(true);
+    }
   });
 
   it('оттайка приходит по расписанию и заново взводит интервал', () => {

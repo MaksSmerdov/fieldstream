@@ -18,10 +18,12 @@ import {
   bootstrapDatabase,
   connectionUrl,
   runMigrations,
+  syncAlarmRules,
   syncTopology,
 } from '@fieldstream/db';
 import type { ConnectionTarget } from '@fieldstream/db';
 import {
+  DEFAULT_ALARM_RULES,
   DEMO_STAND,
   DEVICE_PROFILES,
   buildDeviceReadPlan,
@@ -31,7 +33,7 @@ import {
   rc2000Profile,
   readSimulatedBlock,
 } from '@fieldstream/device-profiles';
-import { SystemClock } from '@fieldstream/domain';
+import { SystemClock, alarmDedupeKey, alarmIdOf } from '@fieldstream/domain';
 import { createProducer, encodeMessage, headerText, sendMessages } from '@fieldstream/kafka';
 import { createLogger } from '@fieldstream/nest-common';
 import { AppModule } from '../../src/app.module.js';
@@ -54,6 +56,17 @@ const BLOCKS: RawBlock[] = buildDeviceReadPlan(rc2000Profile).blocks.map((block)
   words: readSimulatedBlock(REGISTERS, block),
 }));
 const ROWS_PER_FRAME = decodeFrame(rc2000Profile, BLOCKS).length;
+
+/** Кадр без нарушений уставок: значения подобраны так, что ни одна граница не задета. */
+const CALM_REGISTERS = encodeSimulationRegisters(
+  rc2000Profile,
+  new Map(buildSimulationValues(rc2000Profile, 36)),
+);
+const CALM_BLOCKS: RawBlock[] = buildDeviceReadPlan(rc2000Profile).blocks.map((block) => ({
+  registerType: block.registerType,
+  startAddress: block.startAddress,
+  words: readSimulatedBlock(CALM_REGISTERS, block),
+}));
 
 interface Running {
   readonly app: NestFastifyApplication;
@@ -102,7 +115,7 @@ const waitFor = async (what: string, check: () => Promise<boolean>): Promise<voi
 };
 
 /** Кадр прибора с моментом опроса atMs. */
-const frameOf = (deviceCode: string, atMs: number): TelemetryRaw => ({
+const frameOf = (deviceCode: string, atMs: number, blocks: RawBlock[] = BLOCKS): TelemetryRaw => ({
   schema: 'telemetry.raw',
   v: 1,
   ts: new Date(atMs).toISOString(),
@@ -113,16 +126,16 @@ const frameOf = (deviceCode: string, atMs: number): TelemetryRaw => ({
   slaveId: 1,
   profileKey: rc2000Profile.profileKey,
   profileVersion: rc2000Profile.version,
-  blocks: BLOCKS,
+  blocks,
   cycleMs: 40,
   traceId: atMs.toString(16).padStart(16, '0'),
 });
 
 /** Серия кадров прибора с шагом опроса 10 секунд, без пересечений между тестами. */
-const series = (deviceCode: string, count: number): TelemetryRaw[] =>
+const series = (deviceCode: string, count: number, blocks: RawBlock[] = BLOCKS): TelemetryRaw[] =>
   Array.from({ length: count }, () => {
     cursorMs += 10_000;
-    return frameOf(deviceCode, cursorMs);
+    return frameOf(deviceCode, cursorMs, blocks);
   });
 
 /** Публикация кадров от имени сборщика, как в живом стенде. */
@@ -182,7 +195,7 @@ const startProcessor = async (): Promise<Running> => {
     POSTGRES_DB: target.database,
     FS_INGEST_PASSWORD: PASSWORDS.ingest,
     HEALTH_INTERVAL_MS: '1000',
-    LOG_LEVEL: 'error',
+    LOG_LEVEL: process.env['PROCESSOR_LOG'] ?? 'error',
   });
   const pool = new pg.Pool({
     connectionString: connectionUrl(target, ROLES.ingest, PASSWORDS.ingest),
@@ -280,6 +293,7 @@ beforeAll(async () => {
   const owner = new pg.Client({ connectionString: migratorUrl });
   await owner.connect();
   await syncTopology(owner, DEMO_STAND, DEVICE_PROFILES);
+  await syncAlarmRules(owner, DEFAULT_ALARM_RULES);
   await owner.end();
 
   kafka = new Kafka({ clientId: 'pipeline-test', brokers: [brokers], logLevel: logLevel.NOTHING });
@@ -377,6 +391,42 @@ describe('процессор на настоящих Kafka и TimescaleDB', () =
       { error_class: 'invalid_json', key: 'RC-102' },
       { error_class: 'unknown_device', key: 'RC-999' },
     ]);
+  });
+
+  /**
+   * Состояние алармов живёт в памяти процесса. Без восстановления при запуске эпизод,
+   * открытый до перезапуска, не был бы снят никогда: движок не знает, что он поднят,
+   * а счётчик активных алармов на экранах врал бы до ручного вмешательства.
+   */
+  it('эпизод, открытый до перезапуска, снимается после него', async () => {
+    const raisedAtMs = cursorMs;
+    const dedupeKey = alarmDedupeKey({
+      deviceCode: 'RC-105',
+      metricKey: 'supply_temp_c',
+      mode: 'cooling',
+      raisedAt: raisedAtMs,
+    });
+
+    await admin.query(
+      `INSERT INTO core.alarm_events (id, device_id, metric_key, mode, severity, boundary,
+         value, threshold, occurred_at, dedupe_key)
+       SELECT $1::uuid, d.id, 'supply_temp_c', 'cooling', 'warning', 'max', 9.9, 2, $3, $4
+       FROM core.devices d WHERE d.code = $2`,
+      [alarmIdOf(dedupeKey), 'RC-105', new Date(raisedAtMs).toISOString(), dedupeKey],
+    );
+
+    const running = await startProcessor();
+    await publish(series('RC-105', 4, CALM_BLOCKS));
+
+    await waitFor('эпизод снят', async () => {
+      const result = await admin.query<{ n: string }>(
+        `SELECT count(*) AS n FROM core.alarm_events
+         WHERE dedupe_key = $1 AND cleared_at IS NOT NULL`,
+        [dedupeKey],
+      );
+      return Number(result.rows[0]?.n ?? 0) === 1;
+    });
+    await stopProcessor(running);
   });
 
   it('кратковременный отказ базы ставит партицию на паузу, после него всё дописывается без потерь', async () => {

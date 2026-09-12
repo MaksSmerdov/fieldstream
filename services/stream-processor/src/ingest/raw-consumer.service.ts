@@ -9,12 +9,18 @@ import {
   insertAlarmEvents,
   insertDeviceEvents,
   insertReadings,
+  loadOpenAlarmEpisodes,
   recordDlqMessages,
   withTransaction,
 } from '@fieldstream/db';
-import type { DeviceEventRow, DlqRow, ReadingRow } from '@fieldstream/db';
+import type { DeviceEventRow, DlqRow, OpenAlarmEpisode, ReadingRow } from '@fieldstream/db';
 import { toIsoTimestamp } from '@fieldstream/domain';
-import type { Clock, DeviceAlarmState, SpikeFilterState } from '@fieldstream/domain';
+import type {
+  Clock,
+  DeviceAlarmState,
+  MetricAlarmState,
+  SpikeFilterState,
+} from '@fieldstream/domain';
 import {
   commitThrough,
   createConsumer,
@@ -107,6 +113,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
   }
 
   private async start(): Promise<void> {
+    await this.restoreOpenAlarms();
     await this.consumer.connect();
     await this.consumer.subscribe({ topic: TOPICS.telemetryRaw.name, fromBeginning: true });
     await this.consumer.run({
@@ -115,6 +122,48 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
       eachBatch: (payload) => this.handleBatch(payload),
     });
     this.running = true;
+  }
+
+  /**
+   * Поднятые эпизоды из базы в память. Состояние алармов живёт в памяти процесса, поэтому
+   * после перезапуска движок не знал бы, что эпизод открыт, и никогда бы его не снял:
+   * счётчик активных алармов на экранах врал бы до ручного вмешательства.
+   */
+  private async restoreOpenAlarms(): Promise<void> {
+    try {
+      const open = await this.readOpenAlarms();
+      const memory = new Map<string, Record<string, MetricAlarmState>>();
+
+      for (const episode of open) {
+        if (episode.threshold === null) continue;
+        const device = memory.get(episode.deviceCode) ?? {};
+        device[episode.metricKey] = {
+          raised: true,
+          boundary: episode.boundary,
+          severity: episode.severity,
+          threshold: episode.threshold,
+          raisedAt: episode.raisedAtMs,
+          mode: episode.mode,
+        };
+        memory.set(episode.deviceCode, device);
+      }
+
+      this.alarms = new Map(memory);
+      if (open.length > 0)
+        this.log.info({ episodes: open.length }, 'открытые алармы восстановлены');
+    } catch (error) {
+      // Восстановление не обязано удаваться: без него алармы просто поднимутся заново
+      this.log.warn({ err: error }, 'открытые алармы восстановить не удалось');
+    }
+  }
+
+  private async readOpenAlarms(): Promise<OpenAlarmEpisode[]> {
+    const client = await this.pool.connect();
+    try {
+      return await loadOpenAlarmEpisodes(client);
+    } finally {
+      client.release();
+    }
   }
 
   private async handleBatch(payload: EachBatchPayload): Promise<void> {

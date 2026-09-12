@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AlarmRule } from '@fieldstream/contracts';
+import type { AlarmRule, DeviceMode } from '@fieldstream/contracts';
 import type {
   AlarmBoundary,
   DeviceAlarmState,
@@ -28,12 +28,17 @@ const rule = (over: Partial<AlarmRule> = {}): AlarmRule => ({
 
 const ok = (value: number | null): MetricSample => ({ value, quality: 'ok' });
 
-const raisedState = (boundary: AlarmBoundary, threshold: number): MetricAlarmState => ({
+const raisedState = (
+  boundary: AlarmBoundary,
+  threshold: number,
+  mode: DeviceMode = 'cooling',
+): MetricAlarmState => ({
   raised: true,
   boundary,
   severity: 'critical',
   threshold,
   raisedAt: T0,
+  mode,
 });
 
 const evaluate = (over: Partial<EvaluateDeviceAlarmsInput> = {}) =>
@@ -165,6 +170,7 @@ describe('evaluateDeviceAlarms: подъём и снятие', () => {
       severity: 'warning',
       threshold: 5,
       raisedAt: T0,
+      mode: 'cooling',
     });
   });
 
@@ -400,7 +406,7 @@ describe('evaluateDeviceAlarms: заглушенные режимы', () => {
       {
         deviceCode: DEVICE,
         metricKey: 'temp',
-        mode: 'service',
+        mode: 'cooling',
         state: 'cleared',
         severity: 'critical',
         value: 99,
@@ -411,6 +417,25 @@ describe('evaluateDeviceAlarms: заглушенные режимы', () => {
       },
     ]);
     expect(result.state['temp']).toEqual(idleAlarmState());
+  });
+
+  /**
+   * Ключ эпизода это прибор, метрика, режим и момент подъёма. Прибор к моменту снятия часто
+   * уже в другом режиме: если подставить текущий, ключ снятия не совпадёт с ключом подъёма,
+   * и эпизод останется незакрытым навсегда, а счётчик активных алармов будет врать.
+   */
+  it('снятие называет режим подъёма, а не тот, в котором прибор оказался', () => {
+    const result = evaluate({
+      mode: 'cooling',
+      metrics: { temp: ok(-10) },
+      rules: [rule({ maxValue: 0, hysteresis: 1 })],
+      prevState: { temp: raisedState('max', 8, 'defrost') },
+    });
+
+    expect(result.transitions).toHaveLength(1);
+    expect(result.transitions[0]?.state).toBe('cleared');
+    expect(result.transitions[0]?.mode).toBe('defrost');
+    expect(result.transitions[0]?.threshold).toBe(8);
   });
 
   it('в режиме off сбрасывает накопленный счётчик нарушений', () => {
