@@ -83,6 +83,24 @@ services:
       disable: true
     restart: 'no'
 
+  seed:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.node
+      args:
+        SERVICE: seed
+    image: fieldstream/seed:dev
+    profiles: ['seed']
+    env_file: ../../.env
+    environment:
+      DATABASE_HOST: timescaledb
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+    restart: 'no'
+
   device-sim:
     build:
       context: ../..
@@ -127,6 +145,27 @@ services:
     environment:
       KAFKA_BROKERS: kafka:9092
       DATABASE_HOST: timescaledb
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      migrator:
+        condition: service_completed_successfully
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.node
+      args:
+        SERVICE: api-gateway
+    image: fieldstream/api-gateway:dev
+    env_file: ../../.env
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_HOST: timescaledb
+    ports:
+      - '8093:8093'
     depends_on:
       kafka-init:
         condition: service_completed_successfully

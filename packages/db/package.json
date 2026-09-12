@@ -25,6 +25,7 @@
   "dependencies": {
     "@fieldstream/contracts": "workspace:*",
     "@fieldstream/device-profiles": "workspace:*",
+    "@fieldstream/domain": "workspace:*",
     "node-pg-migrate": "^9.0.0",
     "pg": "^8.23.0",
     "zod": "^3.23.8"

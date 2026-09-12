@@ -19,6 +19,8 @@ export interface DeviceRef {
   readonly lineId: number;
   readonly code: string;
   readonly lineCode: string;
+  /** Площадка нужна и для ключа подписки живого канала, и для ключа команд. */
+  readonly siteCode: string;
 }
 
 /** Контрольная сумма описания профиля: по ней видно, что версию поменяли, не повысив номер. */
@@ -154,15 +156,25 @@ export const loadDeviceRefs = async (client: pg.ClientBase): Promise<Map<string,
     line_id: number;
     code: string;
     line_code: string;
+    site_code: string;
   }>(
-    `SELECT d.id AS device_id, d.line_id, d.code, l.code AS line_code
-     FROM core.devices d JOIN core.lines l ON l.id = d.line_id`,
+    `SELECT d.id AS device_id, d.line_id, d.code, l.code AS line_code, s.code AS site_code
+     FROM core.devices d
+     JOIN core.lines l ON l.id = d.line_id
+     JOIN core.gateways g ON g.id = l.gateway_id
+     JOIN core.sites s ON s.id = g.site_id`,
   );
 
   return new Map(
     result.rows.map((row) => [
       row.code,
-      { deviceId: row.device_id, lineId: row.line_id, code: row.code, lineCode: row.line_code },
+      {
+        deviceId: row.device_id,
+        lineId: row.line_id,
+        code: row.code,
+        lineCode: row.line_code,
+        siteCode: row.site_code,
+      },
     ]),
   );
 };

@@ -1,7 +1,13 @@
 import type pg from 'pg';
+import type { Quality } from '@fieldstream/contracts';
 
 /** Качество значения в таблице: код, а не строка, чтобы строка телеметрии оставалась узкой. */
 export const QUALITY_CODE = Object.freeze({ ok: 0, stale: 1, substituted: 2, bad: 3 });
+
+const QUALITY_NAME: readonly Quality[] = ['ok', 'stale', 'substituted', 'bad'];
+
+/** Обратный разбор кода качества: слово и код живут рядом, поэтому разъехаться им негде. */
+export const qualityOf = (code: number): Quality => QUALITY_NAME[code] ?? 'bad';
 
 export interface ReadingRow {
   readonly ts: string;

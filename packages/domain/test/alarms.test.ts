@@ -98,6 +98,7 @@ describe('evaluateDeviceAlarms: подбор правила', () => {
         threshold: 5,
         boundary: 'max',
         occurredAt: T0,
+        raisedAt: T0,
       },
     ]);
     expect(result.state['temp']).toEqual(idleAlarmState());
@@ -121,6 +122,7 @@ describe('evaluateDeviceAlarms: подбор правила', () => {
         threshold: -25,
         boundary: 'min',
         occurredAt: T0,
+        raisedAt: T0,
       },
     ]);
     expect(result.state['temp']).toEqual(idleAlarmState());
@@ -154,6 +156,7 @@ describe('evaluateDeviceAlarms: подъём и снятие', () => {
         threshold: 5,
         boundary: 'max',
         occurredAt: T0,
+        raisedAt: T0,
       },
     ]);
     expect(result.state['temp']).toEqual({
@@ -216,6 +219,7 @@ describe('evaluateDeviceAlarms: подъём и снятие', () => {
         threshold: 5,
         boundary: 'max',
         occurredAt: T0 + 60_000,
+        raisedAt: T0,
       },
     ]);
     expect(result.state['temp']).toEqual(idleAlarmState());
@@ -403,6 +407,7 @@ describe('evaluateDeviceAlarms: заглушенные режимы', () => {
         threshold: 5,
         boundary: 'max',
         occurredAt: T0,
+        raisedAt: T0,
       },
     ]);
     expect(result.state['temp']).toEqual(idleAlarmState());

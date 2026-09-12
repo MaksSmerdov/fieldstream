@@ -1,12 +1,19 @@
+import { readdir } from 'node:fs/promises';
 import pg from 'pg';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DEMO_STAND, DEVICE_PROFILES, rc2000Profile } from '@fieldstream/device-profiles';
+import {
+  DEFAULT_ALARM_RULES,
+  DEMO_STAND,
+  DEVICE_PROFILES,
+  rc2000Profile,
+} from '@fieldstream/device-profiles';
 import { connectionUrl } from '../../src/setup/connection.js';
 import type { ConnectionTarget } from '../../src/setup/connection.js';
-import { runMigrations } from '../../src/setup/migrate.js';
+import { MIGRATIONS_DIR, runMigrations } from '../../src/setup/migrate.js';
 import { ROLES, bootstrapDatabase } from '../../src/setup/roles.js';
+import { loadAlarmRules, syncAlarmRules } from '../../src/store/alarms.js';
 import { loadDeviceRefs, syncTopology } from '../../src/store/topology.js';
 import { insertPollCycles, insertReadings } from '../../src/store/writer.js';
 import type { ReadingRow } from '../../src/store/writer.js';
@@ -27,6 +34,10 @@ const connect = async (user: string, password: string): Promise<pg.Client> => {
 };
 
 const migratorUrl = (): string => connectionUrl(target, ROLES.migrator, PASSWORDS.migrator);
+
+/** Сколько миграций лежит в каталоге: иначе каждая новая миграция правит этот тест руками. */
+const migrationCount = async (): Promise<number> =>
+  (await readdir(MIGRATIONS_DIR)).filter((name) => name.endsWith('.sql')).length;
 
 const deviceId = async (client: pg.Client, code: string): Promise<number> => {
   const ref = (await loadDeviceRefs(client)).get(code);
@@ -75,14 +86,18 @@ describe('схема базы на настоящей TimescaleDB', () => {
       (await owner.query<{ found: string | null }>('SELECT to_regclass($1) AS found', [name]))
         .rows[0]?.found != null;
 
+    const total = await migrationCount();
+
     const down = await runMigrations({ databaseUrl: migratorUrl(), direction: 'down' });
-    expect(down).toHaveLength(7);
+    expect(down).toHaveLength(total);
     expect(await exists('ts.readings')).toBe(false);
     expect(await exists('core.devices')).toBe(false);
+    expect(await exists('core.alarm_events')).toBe(false);
 
     const up = await runMigrations({ databaseUrl: migratorUrl(), direction: 'up' });
-    expect(up).toHaveLength(7);
+    expect(up).toHaveLength(total);
     expect(await exists('ts.readings_1h')).toBe(true);
+    expect(await exists('core.outbox')).toBe(true);
 
     await syncTopology(owner, DEMO_STAND, DEVICE_PROFILES);
     expect((await loadDeviceRefs(owner)).size).toBe(24);
@@ -108,6 +123,108 @@ describe('схема базы на настоящей TimescaleDB', () => {
     await expect(
       api.query(
         `INSERT INTO ts.readings (ts, device_id, metric_key, value) VALUES (now(), 1, 'x', 1)`,
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('стартовые уставки заводятся на все приборы, а правка оператора переносом не затирается', async () => {
+    const owner = await connect(ROLES.migrator, PASSWORDS.migrator);
+
+    const added = await syncAlarmRules(owner, DEFAULT_ALARM_RULES);
+    expect(added).toBeGreaterThan(0);
+    expect(await syncAlarmRules(owner, DEFAULT_ALARM_RULES)).toBe(0);
+    expect(await loadAlarmRules(owner)).toHaveLength(added);
+
+    const supply = (await loadAlarmRules(owner)).filter(
+      (rule) => rule.deviceCode === 'RC-101' && rule.metricKey === 'supply_temp_c',
+    );
+    expect(supply.map((rule) => rule.mode).sort()).toEqual(['cooling', 'defrost']);
+    const cooling = supply.find((rule) => rule.mode === 'cooling');
+    const defrost = supply.find((rule) => rule.mode === 'defrost');
+    expect(cooling?.maxValue ?? 0).toBeLessThan(defrost?.maxValue ?? 0);
+
+    await owner.query(
+      `UPDATE core.alarm_rules SET max_value = -5, updated_by = 'engineer'
+       WHERE metric_key = 'supply_temp_c' AND mode = 'cooling'
+         AND device_id = (SELECT id FROM core.devices WHERE code = 'RC-101')`,
+    );
+    expect(await syncAlarmRules(owner, DEFAULT_ALARM_RULES)).toBe(0);
+
+    const edited = (await loadAlarmRules(owner)).find(
+      (rule) =>
+        rule.deviceCode === 'RC-101' &&
+        rule.metricKey === 'supply_temp_c' &&
+        rule.mode === 'cooling',
+    );
+    expect(edited?.maxValue).toBe(-5);
+  });
+
+  it('аларм создаёт процессор, подтверждает интерфейс, и заменить друг друга они не могут', async () => {
+    const owner = await connect(ROLES.migrator, PASSWORDS.migrator);
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    await syncAlarmRules(owner, DEFAULT_ALARM_RULES);
+    const id = await deviceId(ingest, 'RC-103');
+    const key = 'RC-103|supply_temp_c|cooling|raised|2026-01-01T00:00:00.000Z';
+
+    const raised = await ingest.query(
+      `INSERT INTO core.alarm_events (device_id, metric_key, mode, severity, boundary, value,
+         threshold, occurred_at, dedupe_key)
+       VALUES ($1, 'supply_temp_c', 'cooling', 'warning', 'max', 4.5, 2, now(), $2)
+       ON CONFLICT (dedupe_key) DO NOTHING`,
+      [id, key],
+    );
+    expect(raised.rowCount).toBe(1);
+
+    await expect(
+      api.query(
+        `INSERT INTO core.alarm_events (device_id, metric_key, mode, severity, boundary,
+           occurred_at, dedupe_key)
+         VALUES ($1, 'supply_temp_c', 'cooling', 'info', 'max', now(), 'ключ от интерфейса')`,
+        [id],
+      ),
+    ).rejects.toThrow(/permission denied/);
+
+    const acked = await api.query(
+      `UPDATE core.alarm_events SET acked_by = 'engineer', acked_at = now() WHERE dedupe_key = $1`,
+      [key],
+    );
+    expect(acked.rowCount).toBe(1);
+
+    await expect(
+      api.query('UPDATE core.alarm_events SET value = 0 WHERE dedupe_key = $1', [key]),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      ingest.query('UPDATE core.alarm_rules SET max_value = 0 WHERE device_id = $1', [id]),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('команду в очередь кладёт интерфейс, а факт применения пишет процессор', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+
+    const queued = await api.query(
+      `INSERT INTO core.outbox (aggregate_type, aggregate_id, revision, topic, msg_key, payload)
+       VALUES ('command', 'CMD-1', 1, 'fieldstream.device.commands.v1', 'SITE-A',
+               '{"kind":"line.enable"}')`,
+    );
+    expect(queued.rowCount).toBe(1);
+    await expect(
+      api.query(
+        `INSERT INTO core.outbox (aggregate_type, aggregate_id, revision, topic, msg_key, payload)
+         VALUES ('command', 'CMD-1', 1, 'fieldstream.device.commands.v1', 'SITE-A', '{}')`,
+      ),
+    ).rejects.toThrow(/duplicate key/);
+
+    const applied = await ingest.query(
+      `INSERT INTO core.applied_commands (command_id, line_id, kind, applied_at)
+       SELECT gen_random_uuid(), id, 'line.enable', now() FROM core.lines ORDER BY id LIMIT 1`,
+    );
+    expect(applied.rowCount).toBe(1);
+    await expect(
+      api.query(
+        `INSERT INTO core.applied_commands (command_id, line_id, kind, applied_at)
+         SELECT gen_random_uuid(), id, 'line.enable', now() FROM core.lines ORDER BY id LIMIT 1`,
       ),
     ).rejects.toThrow(/permission denied/);
   });

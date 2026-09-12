@@ -117,3 +117,30 @@ export const recordDlqMessages = async (
     );
   }
 };
+
+/** Стадия готовности стенда: по ней интерфейс рисует загрузочную панель вместо пустых экранов. */
+export interface BootStage {
+  readonly stage: string;
+  readonly status: 'pending' | 'running' | 'done' | 'failed';
+  readonly progressPct?: number;
+  readonly detail?: string;
+}
+
+export const updateBootStage = async (client: pg.ClientBase, stage: BootStage): Promise<void> => {
+  await client.query(
+    `INSERT INTO core.boot_progress (stage, status, detail, progress_pct, started_at, finished_at,
+       updated_at)
+     VALUES ($1, $2, $3, $4,
+       CASE WHEN $2 = 'running' THEN now() END,
+       CASE WHEN $2 IN ('done', 'failed') THEN now() END,
+       now())
+     ON CONFLICT (stage) DO UPDATE
+     SET status = EXCLUDED.status,
+         detail = coalesce(EXCLUDED.detail, core.boot_progress.detail),
+         progress_pct = EXCLUDED.progress_pct,
+         started_at = coalesce(core.boot_progress.started_at, EXCLUDED.started_at),
+         finished_at = EXCLUDED.finished_at,
+         updated_at = now()`,
+    [stage.stage, stage.status, stage.detail ?? null, stage.progressPct ?? 0],
+  );
+};

@@ -6,7 +6,7 @@ import {
   lineCodeSchema,
   traceIdSchema,
 } from '../primitives.js';
-import { deviceModeSchema } from '../topology/device.js';
+import { deviceModeSchema, planModeSchema } from '../topology/device.js';
 import { healthReasonSchema, healthStatusSchema } from './health.js';
 
 /** Итог одного обращения к прибору. Отдельно от телеметрии, потому что пишется и при отказе. */
@@ -21,7 +21,7 @@ export const pollCycleSchema = z
     errorKind: errorKindSchema.nullable(),
     durationMs: z.number().int().min(0),
     requestCount: z.number().int().min(0),
-    planMode: z.enum(['merged', 'naive']),
+    planMode: planModeSchema,
     /** Фактически выбранная задержка: лестница backoff в интерфейсе рисуется по фактам. */
     backoff: z
       .object({

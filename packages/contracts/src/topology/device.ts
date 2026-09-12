@@ -4,6 +4,10 @@ import { z } from 'zod';
 export const registerTypeSchema = z.enum(['holding', 'input']);
 export type RegisterType = z.infer<typeof registerTypeSchema>;
 
+/** Как строить план чтения: склеивать соседние регистры в блоки или спрашивать по одному. */
+export const planModeSchema = z.enum(['merged', 'naive']);
+export type PlanMode = z.infer<typeof planModeSchema>;
+
 export const dataTypeSchema = z.enum(['int16', 'uint16', 'int32', 'uint32', 'float32', 'bits16']);
 export type DataType = z.infer<typeof dataTypeSchema>;
 

@@ -5,6 +5,7 @@ import type { Env } from './config/env.js';
 import { HealthController } from './http/health.controller.js';
 import { InternalController } from './http/internal.controller.js';
 import { MetricsController } from './http/metrics.controller.js';
+import { CommandsService } from './commands/commands.service.js';
 import { LinesService } from './lines/lines.service.js';
 import type { Logger } from '@fieldstream/nest-common';
 import type { CollectorMetrics } from './metrics/metrics.js';
@@ -32,6 +33,7 @@ export class AppModule {
         { provide: METRICS, useValue: deps.metrics },
         KafkaPublisher,
         LinesService,
+        CommandsService,
       ],
     };
   }

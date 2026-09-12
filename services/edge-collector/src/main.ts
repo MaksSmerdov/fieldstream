@@ -25,8 +25,11 @@ log.info(
   'edge-collector: опрос линий Modbus TCP',
 );
 log.info(
-  { produces: [TOPICS.telemetryRaw.name, TOPICS.pollCycles.name] },
-  'пишет сырые кадры и события циклов опроса',
+  {
+    produces: [TOPICS.telemetryRaw.name, TOPICS.pollCycles.name, TOPICS.commandResults.name],
+    consumes: [TOPICS.deviceCommands.name],
+  },
+  'пишет сырые кадры, события циклов и ответы на команды, читает команды операторов',
 );
 log.info(
   { port: env.COLLECTOR_HTTP_PORT },

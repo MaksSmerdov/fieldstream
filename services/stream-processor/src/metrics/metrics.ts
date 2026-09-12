@@ -6,6 +6,7 @@ export interface ProcessorMetrics {
   readonly observeFrames: (outcome: string, count: number) => void;
   readonly observeRows: (table: string, count: number) => void;
   readonly observeDlq: (errorClass: string) => void;
+  readonly observeAlarms: (state: string, count: number) => void;
   readonly observeBatch: (topic: string, durationMs: number) => void;
   readonly observeTransient: (topic: string) => void;
 }
@@ -33,6 +34,12 @@ export const createMetrics = (): ProcessorMetrics => {
     labelNames: ['error_class'],
     registers: [registry],
   });
+  const alarms = new Counter({
+    name: 'fieldstream_processor_alarms_total',
+    help: 'Переходы алармов по виду перехода',
+    labelNames: ['state'],
+    registers: [registry],
+  });
   const batches = new Histogram({
     name: 'fieldstream_processor_batch_duration_seconds',
     help: 'Длительность обработки пачки от разбора до подтверждения смещения',
@@ -57,6 +64,9 @@ export const createMetrics = (): ProcessorMetrics => {
     },
     observeDlq: (errorClass) => {
       dlq.inc({ error_class: errorClass });
+    },
+    observeAlarms: (state, count) => {
+      alarms.inc({ state }, count);
     },
     observeBatch: (topic, durationMs) => {
       batches.observe({ topic }, durationMs / 1000);
