@@ -55,7 +55,7 @@ let sent: { path: string; body: unknown } | null = null;
 const stubFetch = (replies: Replies = {}): void => {
   const rules: AlarmRulesResponse = {
     deviceCode: 'RC-101',
-    rules: replies.rules ?? [rule('cooling', 2), rule('defrost', 12)],
+    rules: [...(replies.rules ?? [rule('cooling', 2), rule('defrost', 12)])],
   };
 
   Object.defineProperty(globalThis, 'fetch', {

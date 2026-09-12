@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AlarmsResponse, TopologyResponse } from '@fieldstream/contracts';
@@ -216,17 +217,18 @@ describe('живой канал', () => {
       boundary: 'max',
       occurredAt: '2026-02-11T10:00:00.000Z',
     };
-    client.setQueryData<AlarmsResponse>(queryKeys.alarms({ state: 'any' }), {
-      items: [],
-      nextCursor: null,
-      serverTime: '2026-02-11T10:00:00.000Z',
+    client.setQueryData<InfiniteData<AlarmsResponse>>(queryKeys.alarms({ state: 'any' }), {
+      pageParams: [null],
+      pages: [{ items: [], nextCursor: null, serverTime: '2026-02-11T10:00:00.000Z' }],
     });
 
     source.emit('alarm', alarm, '7:3');
     source.emit('alarm', alarm, '7:3');
 
-    const feed = client.getQueryData<AlarmsResponse>(queryKeys.alarms({ state: 'any' }));
-    expect(feed?.items).toHaveLength(1);
+    const feed = client.getQueryData<InfiniteData<AlarmsResponse>>(
+      queryKeys.alarms({ state: 'any' }),
+    );
+    expect(feed?.pages[0]?.items).toHaveLength(1);
     expect(deviceOf(client.getQueryData<TopologyResponse>(queryKeys.topology))?.activeAlarms).toBe(
       1,
     );

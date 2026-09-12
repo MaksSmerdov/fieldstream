@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import type {
   AlarmListItem,
   AlarmsResponse,
@@ -11,8 +12,12 @@ import type {
   TopologyResponse,
 } from '@fieldstream/contracts';
 import { findDevice, patchTopologyDevice } from '../../features/topology/topology-patch.js';
+
 import { queryKeys } from '../api/query-keys.js';
 import { useEventStream } from './useEventStream.js';
+
+/** Лента листается курсором, поэтому в кэше лежат страницы, а не один список. */
+type AlarmFeedData = InfiniteData<AlarmsResponse>;
 
 /**
  * Живое событие правит кэш точечно и не ходит в сеть. Прежний подход, перезапрос всего окна
@@ -110,19 +115,30 @@ export const useLivePatch = (keys: readonly string[], enabled = true): void => {
       };
 
       // Лента открыта с разными фильтрами: правим все страницы, где этот эпизод уместен
-      for (const [key, data] of client.getQueriesData<AlarmsResponse>({ queryKey: ['alarms'] })) {
-        if (data === undefined) continue;
-        const existing = data.items.findIndex((candidate) => candidate.id === item.id);
-        const items =
-          existing >= 0
-            ? data.items.map((candidate, index) =>
-                index === existing
-                  ? { ...candidate, ...item, ackedBy: candidate.ackedBy }
-                  : candidate,
-              )
-            : [item, ...data.items];
+      for (const [key, data] of client.getQueriesData<AlarmFeedData>({ queryKey: ['alarms'] })) {
+        const first = data?.pages[0];
+        if (data === undefined || first === undefined) continue;
 
-        client.setQueryData<AlarmsResponse>(key, { ...data, items });
+        const known = data.pages.some((page) =>
+          page.items.some((candidate) => candidate.id === item.id),
+        );
+        const pages = known
+          ? data.pages.map((page) => ({
+              ...page,
+              items: page.items.map((candidate) =>
+                candidate.id === item.id
+                  ? {
+                      ...candidate,
+                      ...item,
+                      ackedBy: candidate.ackedBy,
+                      ackedAt: candidate.ackedAt,
+                    }
+                  : candidate,
+              ),
+            }))
+          : [{ ...first, items: [item, ...first.items] }, ...data.pages.slice(1)];
+
+        client.setQueryData<AlarmFeedData>(key, { ...data, pages });
       }
 
       client.setQueryData<TopologyResponse>(queryKeys.topology, (current) => {

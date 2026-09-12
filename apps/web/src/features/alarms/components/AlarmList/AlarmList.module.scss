@@ -1,0 +1,76 @@
+.feed {
+  padding: 8px 14px 12px;
+  overflow-x: auto;
+
+  &__head {
+    display: grid;
+    grid-template-columns: 170px 90px minmax(160px, 1fr) 220px 110px 150px 170px;
+    gap: 10px;
+    min-width: 1060px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--mui-palette-divider);
+    color: var(--mui-palette-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.7rem;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 170px 90px minmax(160px, 1fr) 220px 110px 150px 170px;
+    gap: 10px;
+    align-items: center;
+    min-width: 1060px;
+    min-height: 44px;
+    border-bottom: 1px solid var(--mui-palette-divider);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__moment {
+    color: var(--mui-palette-text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__device {
+    color: var(--mui-palette-primary-main);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__metric {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__mode {
+    color: var(--mui-palette-text-secondary);
+  }
+
+  &__value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__duration {
+    color: var(--mui-palette-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__quiet {
+    color: var(--mui-palette-text-disabled);
+  }
+
+  &__acked {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--mui-palette-text-secondary);
+  }
+}
