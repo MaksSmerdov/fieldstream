@@ -5,6 +5,7 @@ import {
   bootResponseSchema,
   commandAcceptedSchema,
   commandProgressSchema,
+  deviceEventsResponseSchema,
   deviceProfileViewSchema,
   deviceSnapshotSchema,
   meResponseSchema,
@@ -24,6 +25,7 @@ import type {
   CommandAccepted,
   CommandProgressResponse,
   CommandRequest,
+  DeviceEventsResponse,
   DeviceProfileView,
   DeviceSnapshot,
   MeResponse,
@@ -88,6 +90,14 @@ export const api = {
         maxPoints: params.maxPoints,
       })}`,
       (value) => seriesResponseSchema.parse(value),
+    ),
+
+  deviceEvents: async (
+    code: string,
+    params: { from: string; to: string },
+  ): Promise<DeviceEventsResponse> =>
+    request(`/api/devices/${code}/events${query({ from: params.from, to: params.to })}`, (value) =>
+      deviceEventsResponseSchema.parse(value),
     ),
 
   readPlan: async (code: string, mode: PlanMode): Promise<ReadPlanResponse> =>

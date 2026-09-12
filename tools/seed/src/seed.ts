@@ -30,8 +30,14 @@ export const seedHistory = async (
 ): Promise<SeedReport> => {
   const to = new Date(Math.floor(options.until.getTime() / 3_600_000) * 3_600_000);
   const from = new Date(to.getTime() - options.days * 86_400_000);
+  const edge = await historyEdge(client, to);
 
   await client.query('SET LOCAL synchronous_commit = off');
+  // Правки задевают уже сжатые куски: при повторном засеве строку в сжатом сегменте нельзя
+  // изменить, не распаковав сегмент целиком, а предел по умолчанию это сто тысяч строк на
+  // транзакцию. Для разовой заливки задним числом предел снимается, иначе засев падает на
+  // середине с сообщением про лимит распаковки.
+  await client.query('SET LOCAL timescaledb.max_tuples_decompressed_per_dml_transaction = 0');
 
   let readings = 0;
   const waves = DEVICE_PROFILES.flatMap((profile) =>
@@ -53,17 +59,28 @@ export const seedHistory = async (
        CROSS JOIN core.devices d
        WHERE d.profile_key = $2
        ON CONFLICT DO NOTHING`,
-      [wave.metricKey, item.profileKey, from.toISOString(), to.toISOString(), wave.precision],
+      [wave.metricKey, item.profileKey, from.toISOString(), edge.toISOString(), wave.precision],
     );
 
     readings += result.rowCount ?? 0;
     options.onProgress?.('readings', index + 1, waves.length);
   }
 
-  const defrosts = await seedDefrosts(client, from, to);
-  const alarms = await seedIncidents(client, to);
+  const defrosts = await seedDefrosts(client, from, edge);
+  const alarms = await seedIncidents(client, edge);
 
-  return { readings, alarms, defrosts, from: from.toISOString(), to: to.toISOString() };
+  return { readings, alarms, defrosts, from: from.toISOString(), to: edge.toISOString() };
+};
+
+/**
+ * Докуда засевать. Живые данные уже лежащие в базе перекрывать нельзя: у засева своя волна,
+ * у опроса свои значения, и на графике получились бы две правды об одном часе сразу.
+ */
+const historyEdge = async (client: pg.ClientBase, to: Date): Promise<Date> => {
+  const result = await client.query<{ at: Date | null }>('SELECT min(ts) AS at FROM ts.readings');
+  const earliest = result.rows[0]?.at ?? null;
+
+  return earliest === null || earliest.getTime() > to.getTime() ? to : earliest;
 };
 
 /** Оттайка раз в шесть часов и сколько она длится: полоса режимов на экране рисуется по этим событиям. */

@@ -1,0 +1,12 @@
+.chart {
+  width: 100%;
+  min-height: 280px;
+
+  :global(.u-legend) {
+    display: none;
+  }
+
+  :global(.u-select) {
+    background: var(--mui-palette-action-hover);
+  }
+}

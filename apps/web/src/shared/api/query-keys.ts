@@ -12,6 +12,8 @@ export const queryKeys = {
   profile: (code: string) => ['device', code, 'profile'] as const,
   series: (code: string, metrics: readonly string[], from: string, to: string) =>
     ['device', code, 'series', metrics.join(','), from, to] as const,
+  deviceEvents: (code: string, from: string, to: string) =>
+    ['device', code, 'events', from, to] as const,
   readPlan: (code: string, mode: PlanMode) => ['device', code, 'read-plan', mode] as const,
   alarmRules: (code: string) => ['device', code, 'alarm-rules'] as const,
   alarms: (params: Partial<AlarmsQuery>) =>
