@@ -83,6 +83,24 @@ services:
       disable: true
     restart: 'no'
 
+  seed:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.node
+      args:
+        SERVICE: seed
+    image: fieldstream/seed:dev
+    profiles: ['seed']
+    env_file: ../../.env
+    environment:
+      DATABASE_HOST: timescaledb
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+    restart: 'no'
+
   device-sim:
     build:
       context: ../..
