@@ -16,7 +16,7 @@ import { filterKey, processFrame } from '../../src/ingest/frame.js';
 import type { FrameOutcome } from '../../src/ingest/frame.js';
 
 const REFS = new Map<string, DeviceRef>([
-  ['RC-101', { deviceId: 1, lineId: 1, code: 'RC-101', lineCode: 'L1' }],
+  ['RC-101', { deviceId: 1, lineId: 1, code: 'RC-101', lineCode: 'L1', siteCode: 'SITE-A' }],
 ]);
 const SOURCE = { partition: 2, offset: '184' };
 

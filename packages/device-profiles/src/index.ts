@@ -6,3 +6,4 @@ export * from './profiles/catalog.js';
 export * from './stand.js';
 export * from './profiles/rc-2000.js';
 export * from './profiles/pm-3phase.js';
+export * from './alarm-defaults.js';

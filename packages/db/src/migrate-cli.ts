@@ -1,9 +1,10 @@
 import pg from 'pg';
 import { z } from 'zod';
-import { DEMO_STAND, DEVICE_PROFILES } from '@fieldstream/device-profiles';
+import { DEFAULT_ALARM_RULES, DEMO_STAND, DEVICE_PROFILES } from '@fieldstream/device-profiles';
 import { connectionUrl } from './setup/connection.js';
 import { runMigrations } from './setup/migrate.js';
 import { ROLES, bootstrapDatabase } from './setup/roles.js';
+import { syncAlarmRules } from './store/alarms.js';
 import { syncTopology } from './store/topology.js';
 
 const secret = z.string().min(1, 'пароль обязателен, значения по умолчанию нет');
@@ -64,6 +65,9 @@ if (env.MIGRATE_DIRECTION === 'up') {
         (profile) => `${profile.profileKey}@${String(profile.version)}`,
       ),
     });
+
+    const rules = await syncAlarmRules(owner, DEFAULT_ALARM_RULES);
+    say('стартовые уставки на месте', { added: rules });
   } finally {
     await owner.end();
   }
