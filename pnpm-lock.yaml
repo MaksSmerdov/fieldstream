@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: false
   excludeLinksFromLockfile: false
 
+overrides:
+  fastify: ^5.12.4
+
 importers:
 
   .:
@@ -171,6 +174,73 @@ importers:
       '@types/node':
         specifier: ^22.9.0
         version: 22.20.2
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
+
+  services/api-gateway:
+    dependencies:
+      '@fieldstream/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@fieldstream/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@fieldstream/device-profiles':
+        specifier: workspace:*
+        version: link:../../packages/device-profiles
+      '@fieldstream/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@fieldstream/kafka':
+        specifier: workspace:*
+        version: link:../../packages/kafka
+      '@fieldstream/nest-common':
+        specifier: workspace:*
+        version: link:../../packages/nest-common
+      '@nestjs/common':
+        specifier: ^12.0.1
+        version: 12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-fastify':
+        specifier: ^12.0.1
+        version: 12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@prometheus-io/client':
+        specifier: ^0.16.1
+        version: 0.16.1
+      fastify:
+        specifier: ^5.12.4
+        version: 5.12.4
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.2
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -1421,9 +1491,6 @@ packages:
 
   fastify-plugin@6.0.0:
     resolution: {integrity: sha512-fZOty7z3O7vOliF6d8bHE3wiEh1KcNnKEQensSgTk9C1DvN6nRLS++XVd86v33Hw/8u9Un8A1zDrQ8ujcQDHEg==}
-
-  fastify@5.12.1:
-    resolution: {integrity: sha512-FWi+tQvwxR/PeRX7Z2mhfEF5ozJ3jn9asiiclzKXNSzJRHAYcU924aIOKAdHFJ+YIKieh3cqr1IwCOvTr41B3Q==}
 
   fastify@5.12.4:
     resolution: {integrity: sha512-zATD676fP6tBMsn+jQ7Q5/cO/Qo+149TXH0dUqUKel+1/hcZxwIbnflqtPa9EjlrvpY8eCZcL3M1UYrMc31Y7g==}
@@ -2736,7 +2803,7 @@ snapshots:
       '@nestjs/common': 12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 12.0.1(@nestjs/common@12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
       fast-querystring: 1.1.2
-      fastify: 5.12.1
+      fastify: 5.12.4
       fastify-plugin: 6.0.0
       find-my-way: 9.9.0
       light-my-request: 6.6.0
@@ -3515,24 +3582,6 @@ snapshots:
   fast-uri@4.1.4: {}
 
   fastify-plugin@6.0.0: {}
-
-  fastify@5.12.1:
-    dependencies:
-      '@fastify/ajv-compiler': 4.0.6
-      '@fastify/error': 4.2.0
-      '@fastify/fast-json-stringify-compiler': 5.1.0
-      '@fastify/proxy-addr': 5.1.0
-      abstract-logging: 2.0.1
-      avvio: 9.3.0
-      fast-json-stringify: 7.0.1
-      find-my-way: 9.9.0
-      light-my-request: 6.6.0
-      pino: 10.3.1
-      process-warning: 5.1.0
-      rfdc: 1.4.1
-      secure-json-parse: 4.1.0
-      semver: 7.8.5
-      toad-cache: 3.7.4
 
   fastify@5.12.4:
     dependencies:
