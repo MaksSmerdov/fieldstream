@@ -17,7 +17,7 @@ const UNPREFIXED = ['health/live', 'health/ready', 'metrics'];
 export const createApp = async (deps: AppDeps): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.register(deps),
-    new FastifyAdapter(),
+    new FastifyAdapter({ trustProxy: deps.env.TRUST_PROXY }),
     { logger: new NestPinoLogger(deps.log) },
   );
 

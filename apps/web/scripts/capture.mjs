@@ -1,0 +1,130 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from '@playwright/test';
+import gifenc from 'gifenc';
+import { PNG } from 'pngjs';
+
+const { GIFEncoder, applyPalette, quantize } = gifenc;
+
+/**
+ * Картинки для README снимаются с живого стенда, а не рисуются руками: иначе они устаревают
+ * молча и через месяц показывают интерфейс, которого уже нет. Запуск: pnpm --filter
+ * @fieldstream/web run shots при поднятом стенде на http://localhost:8080.
+ */
+const BASE = process.env.SHOTS_BASE ?? 'http://localhost:8080';
+const EMAIL = process.env.E2E_EMAIL ?? 'engineer@fieldstream.local';
+const PASSWORD = process.env.E2E_PASSWORD ?? 'fieldstream';
+const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'docs', 'media');
+
+const SHOT = { width: 1440, height: 900 };
+const GIF = { width: 960, height: 600, frameMs: 320 };
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const signIn = async (page) => {
+  await page.goto(`${BASE}/login`);
+  await page.getByLabel('Почта').fill(EMAIL);
+  await page.getByLabel('Пароль').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await page.getByRole('heading', { name: 'Обзор' }).waitFor();
+};
+
+/** Кадры GIF копятся в памяти сырыми пикселями: перекодировать их в файлы незачем. */
+const frames = [];
+
+const grab = async (page) => {
+  const png = PNG.sync.read(await page.screenshot({ type: 'png' }));
+  frames.push({ data: new Uint8ClampedArray(png.data), width: png.width, height: png.height });
+};
+
+const record = async (page, seconds, action) => {
+  const until = Date.now() + seconds * 1000;
+  const running = action?.();
+  while (Date.now() < until) {
+    await grab(page);
+    await sleep(GIF.frameMs);
+  }
+  await running;
+};
+
+const encodeGif = async (path) => {
+  const encoder = GIFEncoder();
+  for (const frame of frames) {
+    const palette = quantize(frame.data, 256);
+    const index = applyPalette(frame.data, palette);
+    encoder.writeFrame(index, frame.width, frame.height, {
+      palette,
+      delay: GIF.frameMs,
+    });
+  }
+  encoder.finish();
+  await writeFile(path, Buffer.from(encoder.bytes()));
+};
+
+const main = async () => {
+  await mkdir(OUT, { recursive: true });
+  const browser = await chromium.launch({ channel: process.env.E2E_CHANNEL ?? 'chrome' });
+
+  // Снимки экранов: полный размер, тёмная тема как на стенде по умолчанию
+  const shots = await browser.newContext({ viewport: SHOT, deviceScaleFactor: 1 });
+  const page = await shots.newPage();
+
+  await page.goto(`${BASE}/login`);
+  await page.getByRole('button', { name: 'Войти' }).waitFor();
+  await sleep(800);
+  await page.screenshot({ path: join(OUT, 'login.png') });
+
+  await signIn(page);
+  await sleep(1500);
+  await page.screenshot({ path: join(OUT, 'overview.png') });
+
+  await page.goto(`${BASE}/device/RC-101`);
+  await page.getByRole('img', { name: /График прибора/ }).waitFor();
+  await sleep(2500);
+  await page.screenshot({ path: join(OUT, 'device.png') });
+
+  await page.getByRole('tab', { name: 'Уставки' }).click();
+  await page.getByText('Уставки по режимам').waitFor();
+  await sleep(800);
+  await page.screenshot({ path: join(OUT, 'rules.png') });
+
+  await page.getByRole('tab', { name: 'Карта регистров' }).click();
+  await page.getByText(/запросов:/).waitFor();
+  await sleep(500);
+  await page.screenshot({ path: join(OUT, 'read-plan.png') });
+
+  await page.goto(`${BASE}/alarms`);
+  await page.getByRole('heading', { name: 'Алармы' }).waitFor();
+  await sleep(1500);
+  await page.screenshot({ path: join(OUT, 'alarms.png') });
+  await shots.close();
+
+  // Ролик: обзор с живыми значениями, переход на прибор, смена окна графика
+  const film = await browser.newContext({ viewport: GIF, deviceScaleFactor: 1 });
+  const stage = await film.newPage();
+  await signIn(stage);
+  await sleep(1200);
+
+  await record(stage, 3);
+  await record(stage, 2, async () => {
+    await stage.getByRole('link', { name: 'RC-101' }).click();
+    await stage.getByRole('img', { name: /График прибора/ }).waitFor();
+  });
+  await record(stage, 3);
+  await record(stage, 3, async () => {
+    await stage.getByRole('button', { name: 'сутки' }).click();
+  });
+  await record(stage, 2, async () => {
+    await stage.getByRole('tab', { name: 'Алармы' }).click();
+    await stage.getByRole('heading', { name: 'Алармы' }).waitFor();
+  });
+  await record(stage, 2);
+  await film.close();
+  await browser.close();
+
+  await encodeGif(join(OUT, 'tour.gif'));
+  process.stdout.write(`снято: 6 картинок и ролик из ${String(frames.length)} кадров\n`);
+};
+
+await main();

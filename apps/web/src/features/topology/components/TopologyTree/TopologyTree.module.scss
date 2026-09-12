@@ -1,0 +1,117 @@
+.tree {
+  position: relative;
+  overflow: auto;
+  height: min(70vh, 720px);
+  border: 1px solid var(--mui-palette-divider);
+  border-radius: 12px;
+  background: var(--mui-palette-background-paper);
+
+  &__canvas {
+    position: relative;
+    width: 100%;
+  }
+
+  &__row {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding-inline: 16px;
+    box-sizing: border-box;
+  }
+
+  &__site {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    width: 100%;
+    padding-top: 8px;
+    border-bottom: 1px solid var(--mui-palette-divider);
+  }
+
+  &__code {
+    color: var(--mui-palette-text-secondary);
+    font-size: 13px;
+    font-weight: 400;
+  }
+
+  &__line {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    padding-left: 12px;
+    color: var(--mui-palette-text-secondary);
+    font-size: 13px;
+  }
+
+  &__line-code {
+    min-width: 96px;
+    color: var(--mui-palette-text-primary);
+    font-weight: 500;
+  }
+
+  &__line-meta {
+    white-space: nowrap;
+  }
+
+  &__device {
+    display: grid;
+    gap: 16px;
+    align-items: center;
+    width: 100%;
+    max-width: 1040px;
+    padding-left: 24px;
+    grid-template-columns: 88px minmax(160px, 360px) 110px 88px 110px 130px;
+  }
+
+  &__link {
+    color: var(--mui-palette-primary-main);
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__label {
+    overflow: hidden;
+    color: var(--mui-palette-text-secondary);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__mode {
+    color: var(--mui-palette-text-secondary);
+    font-size: 13px;
+  }
+
+  &__age {
+    color: var(--mui-palette-text-secondary);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__alarms-empty {
+    color: var(--mui-palette-text-disabled);
+  }
+
+  @media (max-width: 900px) {
+    &__device {
+      grid-template-columns: 80px minmax(0, 1fr) 110px;
+    }
+
+    &__mode,
+    &__age {
+      display: none;
+    }
+
+    &__line-meta {
+      display: none;
+    }
+  }
+}

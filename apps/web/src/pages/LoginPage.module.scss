@@ -1,0 +1,13 @@
+.login-page {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+  justify-content: center;
+  padding: 48px 16px;
+  grid-template-columns: minmax(320px, 380px) minmax(280px, 420px);
+
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: 24px;
+  }
+}

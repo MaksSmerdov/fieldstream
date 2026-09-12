@@ -1,11 +1,14 @@
 import type pg from 'pg';
 import type {
+  DeviceEventKind,
+  DeviceMode,
   DeviceSnapshot,
   SeriesMetric,
   SeriesSource,
   Severity,
   TopologySite,
 } from '@fieldstream/contracts';
+import { deviceModeSchema } from '@fieldstream/contracts';
 import { qualityOf } from './writer.js';
 
 interface TopologyRow {
@@ -33,7 +36,14 @@ interface TopologyRow {
   readonly last_ok_at: Date | null;
   readonly active_alarms: string;
   readonly worst: number | null;
+  readonly last_ts: Date | null;
+  readonly stale: boolean;
 }
+
+/** Последнее значение прибора за последний час: по нему сервер решает, устарели ли данные. */
+const LAST_READING = `
+  SELECT device_id, max(ts) AS last_ts FROM ts.readings
+  WHERE ts > now() - INTERVAL '1 hour' GROUP BY device_id`;
 
 /** Незакрытые алармы прибора: счётчик и худшая важность одним подзапросом. */
 const ACTIVE_ALARMS = `
@@ -63,13 +73,18 @@ export const loadTopologyTree = async (client: pg.ClientBase): Promise<TopologyS
             d.code AS device_code, d.label, d.profile_key, d.profile_version, d.slave_id,
             d.enabled AS device_enabled,
             st.status, st.reason, st.mode, st.since, st.last_ok_at,
-            coalesce(a.active, 0) AS active_alarms, a.worst
+            coalesce(a.active, 0) AS active_alarms, a.worst,
+            r.last_ts,
+            (r.last_ts IS NULL
+              OR now() - r.last_ts > make_interval(secs => l.poll_interval_ms * 3 / 1000.0))
+              AS stale
      FROM core.sites s
      JOIN core.gateways g ON g.site_id = s.id
      JOIN core.lines l ON l.gateway_id = g.id
      JOIN core.devices d ON d.line_id = l.id
      LEFT JOIN core.device_state st ON st.device_id = d.id
      LEFT JOIN (${ACTIVE_ALARMS}) a ON a.device_id = d.id
+     LEFT JOIN (${LAST_READING}) r ON r.device_id = d.id
      ORDER BY s.code, g.code, l.code, d.code`,
   );
 
@@ -116,6 +131,8 @@ export const loadTopologyTree = async (client: pg.ClientBase): Promise<TopologyS
       lastOkAt: isoOrNull(row.last_ok_at),
       activeAlarms: Number(row.active_alarms),
       worstSeverity: row.worst === null ? null : (SEVERITY_BY_RANK[row.worst] ?? null),
+      stale: row.stale,
+      staleSince: isoOrNull(row.last_ts),
     });
   }
 
@@ -316,4 +333,133 @@ export const loadLineSite = async (
   );
 
   return result.rows[0]?.site_code ?? null;
+};
+
+/** Что известно о готовности стенда: по этим числам собирается загрузочная панель. */
+export interface BootFacts {
+  readonly devices: number;
+  readonly historyRows: number;
+  readonly freshReadingAgeSec: number | null;
+  readonly seededStage: {
+    readonly status: 'pending' | 'running' | 'done' | 'failed';
+    readonly progressPct: number;
+    readonly detail: string | null;
+  } | null;
+}
+
+/**
+ * Факты готовности одним запросом. Считается не «всё ли хорошо», а конкретные числа:
+ * панель решает сама, что показать, и не зависит от чужого представления о готовности.
+ */
+export const loadBootFacts = async (client: pg.ClientBase): Promise<BootFacts> => {
+  const result = await client.query<{
+    devices: string;
+    history_rows: string;
+    fresh_age_sec: string | null;
+    seed_status: 'pending' | 'running' | 'done' | 'failed' | null;
+    seed_pct: number | null;
+    seed_detail: string | null;
+  }>(
+    `SELECT (SELECT count(*) FROM core.devices) AS devices,
+            (SELECT count(*) FROM ts.readings_1h) AS history_rows,
+            (SELECT extract(epoch FROM now() - max(ts))::int FROM ts.readings
+              WHERE ts > now() - INTERVAL '1 hour') AS fresh_age_sec,
+            b.status AS seed_status, b.progress_pct AS seed_pct, b.detail AS seed_detail
+     FROM (SELECT 1) one
+     LEFT JOIN core.boot_progress b ON b.stage = 'history'`,
+  );
+  const row = result.rows[0];
+
+  return {
+    devices: Number(row?.devices ?? 0),
+    historyRows: Number(row?.history_rows ?? 0),
+    freshReadingAgeSec: row?.fresh_age_sec === null ? null : Number(row?.fresh_age_sec),
+    seededStage:
+      row?.seed_status == null
+        ? null
+        : {
+            status: row.seed_status,
+            progressPct: row.seed_pct ?? 0,
+            detail: row.seed_detail,
+          },
+  };
+};
+
+export interface DeviceEventsRequest {
+  readonly deviceCode: string;
+  readonly from: string;
+  readonly to: string;
+  readonly limit: number;
+}
+
+export interface DeviceEventsData {
+  readonly initialMode: DeviceMode;
+  readonly changes: readonly { readonly at: string; readonly mode: DeviceMode }[];
+  readonly events: readonly {
+    readonly kind: DeviceEventKind;
+    readonly occurredAt: string;
+    readonly payload: Record<string, unknown>;
+  }[];
+}
+
+interface DeviceEventRow {
+  readonly kind: DeviceEventKind;
+  readonly occurred_at: Date;
+  readonly payload: Record<string, unknown>;
+}
+
+/**
+ * Происшествия прибора за окно плюс режим на его начало. Режим до окна берётся из последней
+ * смены раньше него, а если смен не было вовсе, из текущего состояния: полоса режимов обязана
+ * покрывать окно целиком, иначе её начало пришлось бы додумывать.
+ */
+export const loadDeviceEvents = async (
+  client: pg.ClientBase,
+  request: DeviceEventsRequest,
+): Promise<DeviceEventsData | null> => {
+  const device = await client.query<{ device_id: number; mode: DeviceMode | null }>(
+    `SELECT d.id AS device_id, st.mode
+     FROM core.devices d
+     LEFT JOIN core.device_state st ON st.device_id = d.id
+     WHERE d.code = $1`,
+    [request.deviceCode],
+  );
+  const row = device.rows[0];
+  if (row === undefined) return null;
+
+  const before = await client.query<{ mode: string | null }>(
+    `SELECT payload ->> 'to' AS mode
+     FROM core.device_events
+     WHERE device_id = $1 AND kind = 'mode_changed' AND occurred_at <= $2
+     ORDER BY occurred_at DESC LIMIT 1`,
+    [row.device_id, request.from],
+  );
+
+  const inside = await client.query<DeviceEventRow>(
+    `SELECT kind, occurred_at, payload
+     FROM core.device_events
+     WHERE device_id = $1 AND occurred_at > $2 AND occurred_at <= $3
+     ORDER BY occurred_at LIMIT $4`,
+    [row.device_id, request.from, request.to, request.limit],
+  );
+
+  const events = inside.rows.map((event) => ({
+    kind: event.kind,
+    occurredAt: event.occurred_at.toISOString(),
+    payload: event.payload,
+  }));
+
+  const beforeMode = deviceModeSchema.safeParse(before.rows[0]?.mode);
+
+  return {
+    initialMode: beforeMode.success ? beforeMode.data : (row.mode ?? 'cooling'),
+    changes: events.flatMap((event) => {
+      const mode = deviceModeSchema.safeParse(event.payload['to']);
+
+      return event.kind === 'mode_changed' && mode.success
+        ? [{ at: event.occurredAt, mode: mode.data }]
+        : [];
+    }),
+    events,
+  };
 };

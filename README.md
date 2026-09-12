@@ -5,9 +5,25 @@
 
 Демо-стенд: сеть холодильного оборудования, 24 прибора на 4 последовательных линиях за 2 шлюзами.
 
-> **Статус: в разработке.** Работает путь от прибора до браузерного API: симулятор, сборщик, процессор с алармами, база с историей и шлюз с авторизацией, REST, живым каналом и командами приборам.
-> Осталcя интерфейс, он собирается по плану из [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-> Дорожная карта и текущее состояние ниже.
+> **Статус: в разработке.** Работает весь путь от прибора до экрана: симулятор, сборщик,
+> процессор с алармами, база с историей, шлюз с авторизацией и живым каналом, интерфейс с
+> обзором стенда, экраном прибора, уставками и лентой алармов. Дорожная карта ниже.
+
+![Обзор стенда, экран прибора и лента алармов](docs/media/tour.gif)
+
+Картинки и ролик сняты с живого стенда автоматически: `pnpm --filter @fieldstream/web run shots`
+проходит по экранам и складывает их в `docs/media`. Нарисованных вручную скриншотов в проекте
+нет намеренно, иначе они устаревают молча.
+
+| Обзор стенда                                                                         | Прибор                                                                                         |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| [![Обзор](docs/media/overview.png)](docs/media/overview.png)                         | [![Прибор](docs/media/device.png)](docs/media/device.png)                                      |
+| Сводка, дерево площадки и возраст данных. Живой канал правит числа без перезапросов. | График с полосой режимов: подъём температуры объяснён оттайкой, а не выглядит отказом датчика. |
+
+| Уставки по режимам                                                       | Лента алармов                                                                            |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| [![Уставки](docs/media/rules.png)](docs/media/rules.png)                 | [![Алармы](docs/media/alarms.png)](docs/media/alarms.png)                                |
+| В оттайке границы шире, рядом журнал правок с прежним и новым значением. | Значение рядом с уставкой, подтверждение без ожидания ответа, фильтры в адресе страницы. |
 
 ---
 
@@ -36,6 +52,9 @@
 | Ротация токенов с окном повтора: потерянный ответ не разлогинивает, старый токен закрывает сессию                    | `services/api-gateway/src/auth/auth.service.ts`                |
 | Кольцо живого канала: досылка по `Last-Event-ID` или явное требование перечитать всё                                 | `services/api-gateway/src/events/live-ring.ts`                 |
 | Команды приборам через очередь исходящих в той же транзакции, что и приём                                            | `services/api-gateway/src/commands/outbox-relay.service.ts`    |
+| Живое событие правит кэш экрана точечно, к сети идёт только требование перечитать всё                                | `apps/web/src/shared/sse/useLivePatch.ts`                      |
+| Единая шкала времени во фронте: часы вкладки и сервера расходятся, «свежесть» считается по серверным                 | `apps/web/src/shared/time/serverClock.ts`                      |
+| Единый вход: статика и `/api` с одного origin, у потока событий своя локация без буферизации                         | `infra/nginx/nginx.conf`                                       |
 
 ---
 
@@ -103,8 +122,15 @@ pnpm topics:gen       # пересобрать infra/kafka/topics.conf из ма
 
 ```bash
 cp .env.example .env  # задать пароли: POSTGRES_PASSWORD и три пароля ролей базы
-pnpm stack:up         # Kafka, TimescaleDB, топики, миграции и все сервисы в Docker
+pnpm stack:up         # Kafka, TimescaleDB, топики, миграции, засев истории и все сервисы
 ```
+
+Интерфейс открывается на <http://localhost:8080>: это единственный вход в систему. Nginx отдаёт
+статику и проксирует `/api` в шлюз, поэтому браузер работает в одном origin, без CORS и без
+возни с куками между портами. Внутренние сервисы портов наружу не публикуют.
+
+Пока засев истории идёт, интерфейс не показывает пустые экраны: на входе видна панель
+готовности со стадиями стенда, и она сама сменяется обзором, когда данные появились.
 
 Симулятор слушает Modbus TCP на портах 5020..5023 (линии L1..L4) и отдаёт управляющий API на порту 8090:
 
@@ -131,43 +157,57 @@ docker compose -f infra/compose/docker-compose.yml exec timescaledb psql -U fiel
   -c "select bucket, metric_key, round(avg_value::numeric, 2), n from ts.v_readings_1m where device_id = 1 order by bucket desc limit 9"
 ```
 
-Шлюз слушает порт 8093. Учётные записи стенда заводит мигратор, пароль берётся из `DEMO_PASSWORD`: `viewer@fieldstream.local` (только чтение), `engineer@fieldstream.local` (подтверждение алармов, уставки, команды), `admin@fieldstream.local`.
+Шлюз слушает 8093 внутри сети, наружу его пути отдаёт nginx на 8080. Учётные записи стенда заводит мигратор, пароль берётся из `DEMO_PASSWORD`: `viewer@fieldstream.local` (только чтение), `engineer@fieldstream.local` (подтверждение алармов, уставки, команды), `admin@fieldstream.local`.
 
 ```bash
-token=$(curl -s localhost:8093/api/auth/login -H 'content-type: application/json'   -d '{"email":"engineer@fieldstream.local","password":"fieldstream"}' | jq -r .accessToken)
+token=$(curl -s localhost:8080/api/auth/login -H 'content-type: application/json'   -d '{"email":"engineer@fieldstream.local","password":"fieldstream"}' | jq -r .accessToken)
 
-curl -s localhost:8093/api/topology -H "authorization: Bearer $token"          # дерево объектов с состоянием
-curl -s localhost:8093/api/devices/RC-101/latest -H "authorization: Bearer $token"
-curl -s "localhost:8093/api/devices/RC-101/read-plan?mode=naive" -H "authorization: Bearer $token"
-curl -s "localhost:8093/api/alarms?state=active" -H "authorization: Bearer $token"
+curl -s localhost:8080/api/topology -H "authorization: Bearer $token"          # дерево объектов с состоянием
+curl -s localhost:8080/api/devices/RC-101/latest -H "authorization: Bearer $token"
+curl -s "localhost:8080/api/devices/RC-101/read-plan?mode=naive" -H "authorization: Bearer $token"
+curl -s "localhost:8080/api/alarms?state=active" -H "authorization: Bearer $token"
 ```
 
 Серия сама выбирает источник по ширине окна и говорит, откуда взяла числа: до шести часов это сырые строки, до недели минутный агрегат, дальше часовой. Источник, шаг и признак обрезки приходят вместе с данными, поэтому подпись под графиком не может разойтись с содержимым:
 
 ```bash
-curl -s "localhost:8093/api/devices/RC-101/series?metrics=supply_temp_c&from=2026-09-05T00:00:00Z&to=2026-09-12T00:00:00Z"   -H "authorization: Bearer $token" | jq .meta
+curl -s "localhost:8080/api/devices/RC-101/series?metrics=supply_temp_c&from=2026-09-05T00:00:00Z&to=2026-09-12T00:00:00Z"   -H "authorization: Bearer $token" | jq .meta
 # {"source":"readings_1m","bucketMs":1260000,"points":480,"truncated":false, ...}
 ```
 
 Живой канал это одно соединение на вкладку. Первым кадром приходит приветствие с серверным временем и эпохой, дальше показания, состояния приборов и алармы. При обрыве браузер присылает `Last-Event-ID`, и шлюз либо досылает пропущенное, либо честно требует перечитать всё:
 
 ```bash
-curl -N "localhost:8093/api/events?devices=RC-101&access_token=$token"
+curl -N "localhost:8080/api/events?keys=device:RC-101&access_token=$token"
 ```
 
 Команда линии не уходит в брокер прямо из запроса: она ложится в очередь исходящих той же транзакцией, в которой её приняли, а отправкой занимается фоновая рассылка. Применяет её сборщик и отвечает через брокер, в таблицу ответ переносит процессор:
 
 ```bash
-id=$(curl -s localhost:8093/api/commands -H "authorization: Bearer $token" -H 'content-type: application/json'   -d '{"lineCode":"L1","kind":"line.set_poll_interval","args":{"pollIntervalMs":15000}}' | jq -r .commandId)
-curl -s localhost:8093/api/commands/$id -H "authorization: Bearer $token"
+id=$(curl -s localhost:8080/api/commands -H "authorization: Bearer $token" -H 'content-type: application/json'   -d '{"lineCode":"L1","kind":"line.set_poll_interval","args":{"pollIntervalMs":15000}}' | jq -r .commandId)
+curl -s localhost:8080/api/commands/$id -H "authorization: Bearer $token"
 # {"stage":"applied","detail":"такт опроса линии L1 теперь 15000 мс", ...}
 ```
 
-Историю на неделю назад заливает отдельный одноразовый контейнер: `pnpm stack:seed`. Строки не едут по сети, их порождает сама база, поэтому неделя на 24 прибора занимает секунды. В засеянной истории лежат три происшествия, чтобы на экранах алармов было что показывать.
+Историю на неделю назад заливает одноразовый контейнер: он поднимается вместе со стендом, а
+повторить засев можно командой `pnpm stack:seed`. Строки не едут по сети, их порождает сама
+база, поэтому неделя на 24 прибора занимает секунды. Повторный запуск ничего не добавляет и не
+пишет поверх живых значений. В засеянной истории лежат три происшествия и оттайки по расписанию,
+чтобы на экранах было что показывать.
 
 Kafka доступна с хоста на `localhost:29092`, веб-интерфейс к ней поднимается профилем: `docker compose -f infra/compose/docker-compose.yml --profile tools up -d kafka-ui` (http://localhost:8081).
 
-Для ежедневной разработки без пересборки образов `pnpm infra:up` поднимает брокер, базу и применяет миграции, а `pnpm dev` запускает сервисы на хосте в режиме наблюдения за файлами (переменные берутся из `.env`).
+Для ежедневной разработки без пересборки образов `pnpm infra:up` поднимает брокер, базу и
+применяет миграции, а `pnpm dev` запускает сервисы на хосте в режиме наблюдения за файлами
+(переменные берутся из `.env`). В этом режиме фронт живёт на дев-сервере vite (5173) и ходит в
+шлюз на 8093, то есть в два origin: `.env` для этого и держит `CORS_ORIGINS`.
+
+Сценарии Playwright идут против поднятого стенда:
+
+```bash
+pnpm --filter @fieldstream/web exec playwright test          # против http://localhost:8080
+E2E_BASE_URL=http://127.0.0.1:5173 pnpm --filter @fieldstream/web exec playwright test
+```
 
 ---
 
@@ -194,10 +234,11 @@ Kafka доступна с хоста на `localhost:29092`, веб-интерф
 - [x] `edge-collector`: воркер на линию, три предохранителя, размыкатель, публикация в Kafka
 - [x] `stream-processor`: разбор кадров, идемпотентная запись в TimescaleDB, здоровье приборов, очередь недоставленных
 - [x] Алармы по уставкам с учётом режима, `api-gateway`: авторизация, REST, SSE, команды приборам
-- [ ] SPA: топология, прибор, алармы
+- [x] Интерфейс: обзор стенда, экран прибора с графиком, уставки по режимам, лента алармов
 - [x] Compose: Kafka, TimescaleDB, топики из манифеста, миграции, стенд, сборщик, процессор, шлюз
+- [x] Единый вход через nginx: статика и API в одном origin, стенд поднимается одной командой
 - [x] Засев истории и замеры
-- [ ] README с диаграммами и записью работы стенда
+- [x] README с картинками и роликом работы стенда
 - [ ] После публикации: экран Pipeline, Fault Lab, Replay Lab
 
 ---

@@ -11,6 +11,7 @@ import {
 import { healthReasonSchema, healthStatusSchema } from '../messages/health.js';
 import { deviceModeSchema, planModeSchema, registerTypeSchema } from '../topology/device.js';
 import { severitySchema } from '../messages/alarms.js';
+import { deviceEventKindSchema } from '../messages/events.js';
 
 /** Прибор в дереве объектов: адрес, состояние и сколько у него незакрытых алармов. */
 export const topologyDeviceSchema = z
@@ -28,6 +29,13 @@ export const topologyDeviceSchema = z
     lastOkAt: isoTimestampSchema.nullable(),
     activeAlarms: z.number().int().min(0),
     worstSeverity: severitySchema.nullable(),
+    /**
+     * Значения прибора устарели. Решает сервер по такту опроса линии, фронт только рисует
+     * прочерк: иначе каждый экран решал бы сам, что такое «давно не было данных».
+     */
+    stale: z.boolean(),
+    /** Момент последнего значения. Пусто, если за последний час их не было вовсе. */
+    staleSince: isoTimestampSchema.nullable(),
   })
   .strict();
 export type TopologyDevice = z.infer<typeof topologyDeviceSchema>;
@@ -202,3 +210,84 @@ export const readPlanResponseSchema = z
   })
   .strict();
 export type ReadPlanResponse = z.infer<typeof readPlanResponseSchema>;
+
+/** Параметр прибора так, как его показывает экран: значение, единица, словарь состояний. */
+export const profileParamViewSchema = z
+  .object({
+    metricKey: z.string().min(1),
+    label: z.string().min(1),
+    unit: z.string().nullable(),
+    precision: z.number().int().min(0),
+    kind: z.enum(['number', 'enum', 'bits']),
+    /** Словарь кодов состояния: без него перечисление рисуется числом. */
+    states: z.record(z.string(), z.string()).nullable(),
+    /** Разряды слова аварий с их именами. */
+    bits: z
+      .array(
+        z.object({ bit: z.number().int().min(0), key: z.string(), label: z.string() }).strict(),
+      )
+      .nullable(),
+    range: z.object({ min: z.number(), max: z.number() }).strict().nullable(),
+  })
+  .strict();
+export type ProfileParamView = z.infer<typeof profileParamViewSchema>;
+
+export const profileSectionViewSchema = z
+  .object({
+    key: z.string().min(1),
+    label: z.string().min(1),
+    params: z.array(profileParamViewSchema),
+  })
+  .strict();
+
+/**
+ * Описание модели прибора для экрана: секции в том же порядке, что у профиля, чтобы
+ * значения группировались так же, как их видит инженер в документации на прибор.
+ */
+export const deviceProfileViewSchema = z
+  .object({
+    deviceCode: deviceCodeSchema,
+    profileKey: z.string().min(1),
+    profileVersion: z.number().int().min(1),
+    label: z.string().min(1),
+    sections: z.array(profileSectionViewSchema),
+  })
+  .strict();
+export type DeviceProfileView = z.infer<typeof deviceProfileViewSchema>;
+
+/** Отрезок режима на шкале времени: из них складывается полоса под графиком. */
+export const modeSpanSchema = z
+  .object({ mode: deviceModeSchema, from: isoTimestampSchema, to: isoTimestampSchema })
+  .strict();
+export type ModeSpan = z.infer<typeof modeSpanSchema>;
+
+export const deviceEventItemSchema = z
+  .object({
+    kind: deviceEventKindSchema,
+    occurredAt: isoTimestampSchema,
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+export type DeviceEventItem = z.infer<typeof deviceEventItemSchema>;
+
+/**
+ * Происшествия прибора за окно. Отрезки режимов считает сервер: режим на начало окна
+ * определяется последней сменой до него, и без этой строки первый отрезок пришлось бы
+ * додумывать на фронте.
+ */
+export const deviceEventsResponseSchema = z
+  .object({
+    deviceCode: deviceCodeSchema,
+    from: isoTimestampSchema,
+    to: isoTimestampSchema,
+    spans: z.array(modeSpanSchema),
+    events: z.array(deviceEventItemSchema),
+    serverTime: isoTimestampSchema,
+  })
+  .strict();
+export type DeviceEventsResponse = z.infer<typeof deviceEventsResponseSchema>;
+
+export const deviceEventsQuerySchema = z
+  .object({ from: isoTimestampSchema, to: isoTimestampSchema })
+  .strict();
+export type DeviceEventsQuery = z.infer<typeof deviceEventsQuerySchema>;

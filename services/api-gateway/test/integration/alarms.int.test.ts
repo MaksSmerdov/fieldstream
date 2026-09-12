@@ -4,6 +4,7 @@ import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import {
+  alarmRuleAuditResponseSchema,
   alarmRulesResponseSchema,
   alarmRulesUpdateResponseSchema,
   alarmsResponseSchema,
@@ -356,6 +357,31 @@ describe('уставки прибора', () => {
     );
     expect(Number(audit.rows[0]?.n)).toBe(1);
     expect(audit.rows[0]?.changed_by).toBe('engineer@fieldstream.local');
+  });
+
+  /** «Уставка изменена» без прежнего числа не даёт понять, что именно произошло. */
+  it('журнал правок показывает поля с прежним и новым значением', async () => {
+    const { status, json } = await call(`/api/devices/${DEVICE}/alarm-rules/audit`, engineerToken);
+    const response = alarmRuleAuditResponseSchema.parse(json);
+
+    expect(status).toBe(200);
+    expect(response.items).toHaveLength(1);
+
+    const entry = response.items[0];
+    expect(entry?.changedBy).toBe('engineer@fieldstream.local');
+    expect(entry?.created).toBe(false);
+
+    const maxValue = entry?.fields.find((field) => field.field === 'maxValue');
+    expect(maxValue?.after).toBe(-5);
+    expect(maxValue?.before).not.toBe(-5);
+    expect(entry?.fields.map((field) => field.field)).toContain('severity');
+  });
+
+  it('журнал виден и тому, кто править уставки не вправе', async () => {
+    const { status, json } = await call(`/api/devices/${DEVICE}/alarm-rules/audit`, viewerToken);
+
+    expect(status).toBe(200);
+    expect(alarmRuleAuditResponseSchema.parse(json).items).toHaveLength(1);
   });
 
   it('повторная правка теми же значениями ничего не меняет и следа не оставляет', async () => {

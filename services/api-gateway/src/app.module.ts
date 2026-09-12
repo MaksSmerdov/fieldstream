@@ -19,8 +19,10 @@ import { CommandsController } from './commands/commands.controller.js';
 import { OutboxRelayService } from './commands/outbox-relay.service.js';
 import { ProducerService } from './publish/producer.service.js';
 import { AlarmsController } from './read/alarms.controller.js';
+import { BootController } from './read/boot.controller.js';
 import { DevicesController } from './read/devices.controller.js';
 import { TopologyController } from './read/topology.controller.js';
+import { DeviceRefsService } from './topology/device-refs.service.js';
 import { CLOCK, ENV, INSTANCE_ID, LOGGER, METRICS, POOL } from './tokens.js';
 
 export interface AppDeps {
@@ -48,6 +50,7 @@ export class AppModule {
         DevicesController,
         AlarmsController,
         CommandsController,
+        BootController,
       ],
       providers: [
         { provide: ENV, useValue: deps.env },
@@ -62,6 +65,7 @@ export class AppModule {
         KafkaBridgeService,
         ProducerService,
         OutboxRelayService,
+        DeviceRefsService,
       ],
     };
   }

@@ -38,6 +38,15 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  /**
+   * Доверять заголовкам обратного прокси. За nginx адрес запроса это адрес прокси, и без
+   * доверия все входы считаются одним ведром ограничителя, а в журнале сессий у всех один
+   * и тот же адрес. Включать можно только там, где прокси действительно свой.
+   */
+  TRUST_PROXY: z
+    .enum(['on', 'off'])
+    .default('off')
+    .transform((value) => value === 'on'),
   SSE_PING_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
   /** Мост из брокера в живой канал. Выключается там, где шлюз поднимают без Kafka. */
   SSE_BRIDGE: z.enum(['on', 'off']).default('on'),

@@ -1,0 +1,35 @@
+.summary {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--mui-palette-divider);
+  border-radius: 12px;
+  background: var(--mui-palette-background-paper);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+
+  &__item {
+    display: grid;
+    gap: 2px;
+    min-width: 104px;
+  }
+
+  &__value_plain {
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__value_good {
+    color: var(--mui-palette-success-main);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__value_bad {
+    color: var(--mui-palette-error-main);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__value_warn {
+    color: var(--mui-palette-warning-main);
+    font-variant-numeric: tabular-nums;
+  }
+}

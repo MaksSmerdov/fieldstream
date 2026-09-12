@@ -12,25 +12,31 @@ import {
 import type pg from 'pg';
 import {
   alarmRulesUpdateSchema,
+  deviceEventsQuerySchema,
   pickSource,
   planModeSchema,
   seriesQuerySchema,
 } from '@fieldstream/contracts';
 import type {
+  AlarmRuleAuditResponse,
   AlarmRulesResponse,
   AlarmRulesUpdateResponse,
+  DeviceEventsResponse,
+  DeviceProfileView,
   DeviceSnapshot,
   ReadPlanResponse,
   SeriesResponse,
 } from '@fieldstream/contracts';
 import {
+  loadAlarmRuleAudit,
   loadDeviceAlarmRules,
+  loadDeviceEvents,
   loadDeviceSnapshot,
   loadSeries,
   updateDeviceAlarmRules,
 } from '@fieldstream/db';
 import { buildDeviceReadPlan, profileByVersion } from '@fieldstream/device-profiles';
-import { toIsoTimestamp } from '@fieldstream/domain';
+import { buildModeSpans, toIsoTimestamp } from '@fieldstream/domain';
 import type { Clock } from '@fieldstream/domain';
 import { CurrentUser, RequirePermission } from '../auth/auth.guard.js';
 import type { AccessClaims } from '../auth/tokens.js';
@@ -39,6 +45,12 @@ import { CLOCK, POOL } from '../tokens.js';
 
 /** Сколько тактов опроса подряд можно не получать данные, прежде чем снимок считается устаревшим. */
 const STALE_CYCLES = 3;
+
+/** Потолок происшествий за окно: неделя оттаек на дюжине приборов в него укладывается с запасом. */
+const EVENTS_LIMIT = 500;
+
+/** Сколько правок уставок показывать: журнал на экране, а не выгрузка за всё время. */
+const AUDIT_LIMIT = 50;
 
 @Controller('devices')
 export class DevicesController {
@@ -110,6 +122,44 @@ export class DevicesController {
     };
   }
 
+  /**
+   * Происшествия прибора за окно и полоса режимов по ним. Отрезки считает сервер: режим
+   * на начало окна известен только базе, а без него первый отрезок пришлось бы додумывать.
+   */
+  @Get(':code/events')
+  @RequirePermission('devices')
+  public async events(
+    @Param('code') code: string,
+    @Query() query: unknown,
+  ): Promise<DeviceEventsResponse> {
+    const parsed = deviceEventsQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.issues.map((issue) => issue.message));
+    }
+    if (Date.parse(parsed.data.to) <= Date.parse(parsed.data.from)) {
+      throw new BadRequestException('конец окна должен быть позже начала');
+    }
+
+    const data = await withClient(this.pool, (client) =>
+      loadDeviceEvents(client, { deviceCode: code, ...parsed.data, limit: EVENTS_LIMIT }),
+    );
+    if (data === null) throw new NotFoundException(`прибора ${code} нет в топологии`);
+
+    return {
+      deviceCode: code,
+      from: parsed.data.from,
+      to: parsed.data.to,
+      spans: buildModeSpans({
+        from: parsed.data.from,
+        to: parsed.data.to,
+        initialMode: data.initialMode,
+        changes: data.changes,
+      }),
+      events: [...data.events],
+      serverTime: toIsoTimestamp(this.clock.now()),
+    };
+  }
+
   /** Уставки прибора по режимам: в оттайке границы свои, и это видно прямо в списке. */
   @Get(':code/alarm-rules')
   @RequirePermission('devices')
@@ -121,6 +171,20 @@ export class DevicesController {
     }
 
     return { deviceCode: code, rules };
+  }
+
+  /**
+   * Журнал правок уставок. Читать его может всякий, кто видит прибор: след правки полезен
+   * ровно тем, что виден не только тому, кто правил.
+   */
+  @Get(':code/alarm-rules/audit')
+  @RequirePermission('devices')
+  public async alarmRuleAudit(@Param('code') code: string): Promise<AlarmRuleAuditResponse> {
+    const items = await withClient(this.pool, (client) =>
+      loadAlarmRuleAudit(client, code, AUDIT_LIMIT),
+    );
+
+    return { deviceCode: code, items, serverTime: toIsoTimestamp(this.clock.now()) };
   }
 
   /**
@@ -151,6 +215,46 @@ export class DevicesController {
     if (result === null) throw new NotFoundException(`прибора ${code} нет в топологии`);
 
     return { deviceCode: code, changes: result.changes, rules: result.rules };
+  }
+
+  /**
+   * Описание модели прибора: секции и параметры в порядке профиля. Нужно экрану, чтобы
+   * группировать значения и рисовать перечисления словами, а не кодами.
+   */
+  @Get(':code/profile')
+  @RequirePermission('devices')
+  public async profile(@Param('code') code: string): Promise<DeviceProfileView> {
+    const snapshot = await withClient(this.pool, (client) => loadDeviceSnapshot(client, code));
+    if (snapshot === null) throw new NotFoundException(`прибора ${code} нет в топологии`);
+
+    const profile = profileByVersion(snapshot.profileKey, snapshot.profileVersion);
+    if (profile === undefined) {
+      throw new NotFoundException(
+        `нет профиля ${snapshot.profileKey} версии ${String(snapshot.profileVersion)}`,
+      );
+    }
+
+    return {
+      deviceCode: code,
+      profileKey: profile.profileKey,
+      profileVersion: profile.version,
+      label: profile.label,
+      sections: profile.sections.map((section) => ({
+        key: section.key,
+        label: section.label,
+        params: section.params.map((param) => ({
+          metricKey: param.key,
+          label: param.label,
+          unit: param.unit ?? null,
+          precision: param.precision,
+          kind: param.bits !== undefined ? 'bits' : param.enum !== undefined ? 'enum' : 'number',
+          states: param.enum ?? null,
+          bits:
+            param.bits?.map((bit) => ({ bit: bit.bit, key: bit.key, label: bit.label })) ?? null,
+          range: param.range === undefined ? null : { min: param.range.min, max: param.range.max },
+        })),
+      })),
+    };
   }
 
   /** Карта регистров: тот же план, что уходит на линию, в склеенном или поштучном виде. */

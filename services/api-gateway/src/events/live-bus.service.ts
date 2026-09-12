@@ -23,8 +23,11 @@ const REQUIRED: Readonly<Record<LiveEventKind, ModuleId | null>> = {
 export interface StreamOptions {
   readonly lastEventId: string | null;
   readonly permissions: readonly ModuleId[];
-  /** Подписка экрана прибора: пустое множество означает «всё, что разрешено правами». */
-  readonly devices: ReadonlySet<string> | null;
+  /**
+   * Ключи подписки вкладки вида `device:RC-101` или `site:SITE-A`. Пусто означает
+   * «всё, что разрешено правами»: обзорному экрану нужен весь стенд.
+   */
+  readonly keys: ReadonlySet<string> | null;
 }
 
 const toMessage = (event: LiveEvent): MessageEvent => ({
@@ -87,11 +90,9 @@ export class LiveBusService implements OnModuleInit, OnModuleDestroy {
     const allowed = (event: LiveEvent): boolean => {
       const required = REQUIRED[event.kind];
       if (required !== null && !hasPermission(options.permissions, required)) return false;
-      if (options.devices === null || event.keys.length === 0) return true;
+      if (options.keys === null || event.keys.length === 0) return true;
 
-      return event.keys.some(
-        (key) => !key.startsWith('device:') || options.devices?.has(key.slice('device:'.length)),
-      );
+      return event.keys.some((key) => options.keys?.has(key) ?? false);
     };
 
     return new Observable<MessageEvent>((subscriber) => {

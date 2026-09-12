@@ -1,0 +1,28 @@
+.value {
+  color: var(--mui-palette-text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  &_stale {
+    color: var(--mui-palette-text-disabled);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &_substituted {
+    color: var(--mui-palette-warning-main);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__aside {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
