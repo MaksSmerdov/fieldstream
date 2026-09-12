@@ -22,10 +22,22 @@ const SEVERITY_WORD: Readonly<Record<Severity, string>> = {
 
 /** Высоты рядов заданы: окно прокрутки должно знать размер до отрисовки, иначе список прыгает. */
 const ROW_HEIGHT: Readonly<Record<TopologyRow['kind'], number>> = {
-  site: 44,
-  line: 40,
-  device: 52,
+  site: 42,
+  line: 34,
+  device: 44,
 };
+
+/** Режим сборки плана чтения словами: merged и naive человеку ничего не говорят. */
+const PLAN_WORD: Readonly<Record<string, string>> = {
+  merged: 'чтение блоками',
+  naive: 'чтение по регистрам',
+};
+
+/** Высота шапки колонок: список начинается под ней, и окно прокрутки обязано это учитывать. */
+const HEADER_HEIGHT = 38;
+
+/** Подписи колонок прибора: без них «cooling» и «0 с назад» ничего не говорят. */
+const COLUMNS = ['Прибор', 'Модель', 'Статус', 'Режим', 'Данные', 'Алармы'];
 
 /**
  * Дерево объектов площадки. Список виртуализирован: раскладка и высоты рядов не зависят
@@ -37,93 +49,112 @@ export const TopologyTree = ({ rows }: Props): React.JSX.Element => {
     count: rows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: (index) => ROW_HEIGHT[rows[index]?.kind ?? 'device'],
+    scrollMargin: HEADER_HEIGHT,
     overscan: 8,
   });
 
   return (
-    <div
-      className={styles['tree']}
-      ref={scrollRef}
-      role="region"
-      aria-label="Дерево объектов площадки"
-      tabIndex={0}
-    >
+    <div className={styles['tree']}>
       <div
-        className={styles['tree__canvas']}
-        style={{ height: `${String(virtualizer.getTotalSize())}px` }}
+        className={styles['tree__scroll']}
+        ref={scrollRef}
+        role="region"
+        aria-label="Дерево объектов площадки"
+        tabIndex={0}
       >
-        {virtualizer.getVirtualItems().map((item) => {
-          const row = rows[item.index];
-          if (row === undefined) return null;
+        <div className={styles['tree__header']}>
+          {COLUMNS.map((column) => (
+            <span key={column}>{column}</span>
+          ))}
+        </div>
 
-          return (
-            <div
-              key={row.key}
-              className={styles['tree__row']}
-              style={{
-                height: `${String(item.size)}px`,
-                transform: `translateY(${String(item.start)}px)`,
-              }}
-            >
-              {row.kind === 'site' ? (
-                <Typography variant="subtitle1" className={styles['tree__site']}>
-                  {row.name} <span className={styles['tree__code']}>{row.code}</span>
-                </Typography>
-              ) : null}
+        <div
+          className={styles['tree__canvas']}
+          style={{ height: `${String(virtualizer.getTotalSize())}px` }}
+        >
+          {virtualizer.getVirtualItems().map((item) => {
+            const row = rows[item.index];
+            if (row === undefined) return null;
 
-              {row.kind === 'line' ? (
-                <div className={styles['tree__line']}>
-                  <span className={styles['tree__line-code']}>
-                    {row.gatewayCode} · {row.lineCode}
-                  </span>
-                  <span className={styles['tree__line-meta']}>
-                    {row.baud} бод · опрос {Math.round(row.pollIntervalMs / 1000)} с · план{' '}
-                    {row.planMode}
-                  </span>
-                  {row.enabled ? null : (
-                    <Chip size="small" label="опрос выключен" color="warning" />
-                  )}
-                  {row.offline === 0 ? null : (
-                    <Chip size="small" label={`нет связи: ${String(row.offline)}`} color="error" />
-                  )}
-                </div>
-              ) : null}
+            return (
+              <div
+                key={row.key}
+                className={`${styles['tree__row']} ${
+                  row.kind === 'device' ? (styles['tree__row_device'] ?? '') : ''
+                }`}
+                style={{
+                  height: `${String(item.size)}px`,
+                  transform: `translateY(${String(item.start - HEADER_HEIGHT)}px)`,
+                }}
+              >
+                {row.kind === 'site' ? (
+                  <Typography variant="subtitle1" className={styles['tree__site']}>
+                    {row.name} <span className={styles['tree__code']}>{row.code}</span>
+                  </Typography>
+                ) : null}
 
-              {row.kind === 'device' ? (
-                <div className={styles['tree__device']}>
-                  <RouterLink to={`/device/${row.device.code}`} className={styles['tree__link']}>
-                    {row.device.code}
-                  </RouterLink>
-                  <span className={styles['tree__label']}>{row.device.label}</span>
-                  <StatusChip
-                    status={row.device.status}
-                    reason={row.device.reason}
-                    since={row.device.since}
-                    lastOkAt={row.device.lastOkAt}
-                  />
-                  <span className={styles['tree__mode']}>{row.device.mode}</span>
-                  <span className={styles['tree__age']}>
-                    {row.device.stale ? (
-                      <ValueCell value={null} stale />
-                    ) : (
-                      agoText(row.device.staleSince)
+                {row.kind === 'line' ? (
+                  <div className={styles['tree__line']}>
+                    <span className={styles['tree__line-code']}>
+                      {row.gatewayCode} · {row.lineCode}
+                    </span>
+                    <span className={styles['tree__line-meta']}>
+                      {row.baud} бод · опрос {Math.round(row.pollIntervalMs / 1000)} с ·{' '}
+                      {PLAN_WORD[row.planMode] ?? row.planMode}
+                    </span>
+                    {row.enabled ? null : (
+                      <Chip size="small" label="опрос выключен" color="warning" />
                     )}
-                  </span>
-                  {/* Важность словом, а не только цветом: красное от жёлтого отличают не все */}
-                  {row.device.activeAlarms === 0 ? (
-                    <span className={styles['tree__alarms-empty']}>алармов нет</span>
-                  ) : (
-                    <Chip
-                      size="small"
-                      label={`${SEVERITY_WORD[row.device.worstSeverity ?? 'info']}: ${String(row.device.activeAlarms)}`}
-                      color={row.device.worstSeverity === 'critical' ? 'error' : 'warning'}
-                    />
-                  )}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
+                    {row.offline === 0 ? null : (
+                      <Chip
+                        size="small"
+                        label={`нет связи: ${String(row.offline)}`}
+                        color="error"
+                      />
+                    )}
+                  </div>
+                ) : null}
+
+                {row.kind === 'device' ? (
+                  <div className={styles['tree__device']}>
+                    <RouterLink to={`/device/${row.device.code}`} className={styles['tree__link']}>
+                      {row.device.code}
+                    </RouterLink>
+                    <span className={styles['tree__label']}>{row.device.label}</span>
+                    <span className={styles['tree__status']}>
+                      <StatusChip
+                        status={row.device.status}
+                        reason={row.device.reason}
+                        since={row.device.since}
+                        lastOkAt={row.device.lastOkAt}
+                      />
+                    </span>
+                    <span className={styles['tree__mode']}>{row.device.mode}</span>
+                    <span className={styles['tree__age']}>
+                      {row.device.stale ? (
+                        <ValueCell value={null} stale />
+                      ) : (
+                        agoText(row.device.staleSince)
+                      )}
+                    </span>
+                    {/* Важность словом, а не только цветом: красное от жёлтого отличают не все */}
+                    <span className={styles['tree__alarms']}>
+                      {row.device.activeAlarms === 0 ? (
+                        <span className={styles['tree__alarms-empty']}>нет</span>
+                      ) : (
+                        <Chip
+                          size="small"
+                          label={`${SEVERITY_WORD[row.device.worstSeverity ?? 'info']}: ${String(row.device.activeAlarms)}`}
+                          color={row.device.worstSeverity === 'critical' ? 'error' : 'warning'}
+                        />
+                      )}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
