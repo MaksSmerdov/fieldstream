@@ -117,6 +117,9 @@ importers:
       msw:
         specifier: ^2.11.6
         version: 2.15.0(@types/node@22.20.2)(typescript@5.9.3)
+      playwright-core:
+        specifier: ^1.63.0
+        version: 1.63.0
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0
