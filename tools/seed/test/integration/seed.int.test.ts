@@ -110,8 +110,10 @@ describe('засев истории', () => {
   /**
    * Повтор засева на том же окне ничего не добавляет и не правит значения второй раз:
    * подъём температуры аддитивный, и без этой проверки второй запуск тихо задирал бы историю.
+   * Окно при этом вырождается в пустое, и пересчёт агрегатов обязан его пропустить: иначе
+   * TimescaleDB отвечает «refresh window too small», и стенд после перезапуска не готов.
    */
-  it('повторный засев ничего не добавляет и не задирает значения', async () => {
+  it('повторный засев ничего не добавляет, не задирает значения и не рушит пересчёт', async () => {
     const before = await owner.query<{ sum: string; rows: string }>(
       `SELECT coalesce(sum(value), 0)::text AS sum, count(*)::text AS rows FROM ts.readings`,
     );
@@ -126,6 +128,7 @@ describe('засев истории', () => {
     expect(again.defrosts).toBe(0);
     expect(after.rows[0]?.rows).toBe(before.rows[0]?.rows);
     expect(Number(after.rows[0]?.sum)).toBeCloseTo(Number(before.rows[0]?.sum), 3);
+    await expect(refreshAggregates(owner, again.from, again.to)).resolves.toBe(false);
   });
 
   /** Без пересчёта длинные графики пусты: агрегаты сами догоняют только свежие данные. */

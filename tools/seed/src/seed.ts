@@ -204,12 +204,16 @@ const insertIncidentAlarm = async (
 /**
  * Пересчёт агрегатов на засеянном окне. Без него длинные графики пусты: непрерывные
  * агрегаты сами догоняют только свежие данные, а не залитую задним числом неделю.
+ * Повторный засев не добавляет строк и отдаёт пустое окно, на котором TimescaleDB
+ * обновлять агрегат отказывается. Возвращает, был ли пересчёт.
  */
 export const refreshAggregates = async (
   client: pg.ClientBase,
   from: string,
   to: string,
-): Promise<void> => {
+): Promise<boolean> => {
+  if (Date.parse(from) >= Date.parse(to)) return false;
+
   await client.query(
     `CALL refresh_continuous_aggregate('ts.readings_1m', $1::timestamptz, $2::timestamptz)`,
     [from, to],
@@ -218,6 +222,8 @@ export const refreshAggregates = async (
     `CALL refresh_continuous_aggregate('ts.readings_1h', $1::timestamptz, $2::timestamptz)`,
     [from, to],
   );
+
+  return true;
 };
 
 export interface CompressionReport {

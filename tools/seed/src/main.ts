@@ -56,8 +56,12 @@ try {
   });
 
   await updateBootStage(client, { stage: 'history', status: 'running', progressPct: 60 });
-  await refreshAggregates(client, report.from, report.to);
-  say('агрегаты пересчитаны на засеянном окне');
+  const refreshed = await refreshAggregates(client, report.from, report.to);
+  say(
+    refreshed
+      ? 'агрегаты пересчитаны на засеянном окне'
+      : 'история уже на месте, пересчитывать нечего',
+  );
 
   if (env.SEED_COMPRESS === 'on') {
     await updateBootStage(client, { stage: 'history', status: 'running', progressPct: 80 });
