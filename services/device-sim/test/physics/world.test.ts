@@ -18,6 +18,13 @@ const makeWorld = (
   return { clock, world: createWorld({ stand: DEMO_STAND, seed, clock, speed: 1, faults }) };
 };
 
+/** Параметры приборов стенда: набор не меняется, а собирать его на каждом опросе дорого. */
+const DEVICE_PARAMS = DEMO_STAND.devices.flatMap((device) => {
+  const profile = profileByKey(device.profileKey);
+  if (profile === undefined) return [];
+  return [{ code: device.code, params: listPlanEntries(profile).map((entry) => entry.param) }];
+});
+
 const snapshot = (world: World): Record<string, Record<string, DecodedValue>> =>
   Object.fromEntries(
     DEMO_STAND.devices.map((device) => [
@@ -48,23 +55,20 @@ describe('мир стенда', () => {
       clock.advance(POLL_MS);
       const current = snapshot(world);
 
-      for (const device of DEMO_STAND.devices) {
-        const profile = profileByKey(device.profileKey);
-        if (profile === undefined) continue;
-
-        for (const { param } of listPlanEntries(profile)) {
-          const before = previous[device.code]?.[param.key];
-          const after = current[device.code]?.[param.key];
+      for (const { code, params } of DEVICE_PARAMS) {
+        for (const param of params) {
+          const before = previous[code]?.[param.key];
+          const after = current[code]?.[param.key];
           if (typeof before !== 'number' || typeof after !== 'number') continue;
 
           if (param.maxDelta !== undefined && Math.abs(after - before) >= param.maxDelta) {
-            jumps.push(`${device.code}.${param.key}: ${String(before)} -> ${String(after)}`);
+            jumps.push(`${code}.${param.key}: ${String(before)} -> ${String(after)}`);
           }
           if (param.range !== undefined && (after < param.range.min || after > param.range.max)) {
-            offscale.push(`${device.code}.${param.key}: ${String(after)}`);
+            offscale.push(`${code}.${param.key}: ${String(after)}`);
           }
           if (param.range?.monotonic === true && after < before) {
-            jumps.push(`${device.code}.${param.key} уменьшился`);
+            jumps.push(`${code}.${param.key} уменьшился`);
           }
         }
       }
