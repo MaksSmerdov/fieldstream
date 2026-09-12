@@ -300,3 +300,20 @@ export const loadSeries = async (
 
   return [...byMetric.values()];
 };
+
+/** Площадка линии: ключ топика команд, и он же ключ подписки живого канала. */
+export const loadLineSite = async (
+  client: pg.ClientBase,
+  lineCode: string,
+): Promise<string | null> => {
+  const result = await client.query<{ site_code: string }>(
+    `SELECT s.code AS site_code
+     FROM core.lines l
+     JOIN core.gateways g ON g.id = l.gateway_id
+     JOIN core.sites s ON s.id = g.site_id
+     WHERE l.code = $1`,
+    [lineCode],
+  );
+
+  return result.rows[0]?.site_code ?? null;
+};

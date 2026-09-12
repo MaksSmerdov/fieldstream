@@ -15,6 +15,9 @@ import { LiveBusService } from './events/live-bus.service.js';
 import { HealthController } from './http/health.controller.js';
 import { MetricsController } from './http/metrics.controller.js';
 import type { GatewayMetrics } from './metrics/metrics.js';
+import { CommandsController } from './commands/commands.controller.js';
+import { OutboxRelayService } from './commands/outbox-relay.service.js';
+import { ProducerService } from './publish/producer.service.js';
 import { AlarmsController } from './read/alarms.controller.js';
 import { DevicesController } from './read/devices.controller.js';
 import { TopologyController } from './read/topology.controller.js';
@@ -44,6 +47,7 @@ export class AppModule {
         TopologyController,
         DevicesController,
         AlarmsController,
+        CommandsController,
       ],
       providers: [
         { provide: ENV, useValue: deps.env },
@@ -56,6 +60,8 @@ export class AppModule {
         AuthService,
         LiveBusService,
         KafkaBridgeService,
+        ProducerService,
+        OutboxRelayService,
       ],
     };
   }

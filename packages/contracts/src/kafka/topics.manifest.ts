@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { telemetryRawSchema, telemetryReadingSchema } from '../messages/telemetry.js';
 import { alarmEventSchema } from '../messages/alarms.js';
+import { commandResultSchema, deviceCommandSchema } from '../messages/commands.js';
 import { deviceStateSchema, pollCycleSchema } from '../messages/events.js';
 
 /**
@@ -92,6 +93,31 @@ export const TOPICS = {
     retentionMs: 30 * DAY_MS,
     owner: 'stream-processor',
     why: 'Критичен порядок raised перед cleared внутри прибора, а не глобальный порядок по правилу.',
+  }),
+  deviceCommands: define({
+    name: 'fieldstream.device.commands.v1',
+    schema: deviceCommandSchema,
+    keyOf: (p) => p.siteCode,
+    partitions: 3,
+    cleanupPolicy: 'delete',
+    retentionMs: 7 * DAY_MS,
+    owner: 'api-gateway',
+    why:
+      'Ключ это площадка: команды одной площадке применяются по порядку, чужие сборщик пропускает. ' +
+      'При десятках площадок правильнее топик на площадку, здесь их две.',
+  }),
+  commandResults: define({
+    name: 'fieldstream.device.commands.results.v1',
+    schema: commandResultSchema,
+    keyOf: (p) => p.commandId,
+    partitions: 3,
+    cleanupPolicy: 'compact',
+    retentionMs: null,
+    configs: { 'segment.ms': '60000', 'min.cleanable.dirty.ratio': '0.1' },
+    owner: 'edge-collector',
+    why:
+      'Сборщик про базу не знает: он стоит за NAT и наружу ходит только к брокеру. ' +
+      'Факт применения едет сюда, а в таблицу его переносит процессор.',
   }),
   telemetryRawDlq: define({
     name: 'fieldstream.telemetry.raw.dlq.v1',

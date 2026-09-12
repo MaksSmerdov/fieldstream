@@ -41,6 +41,12 @@ const envSchema = z.object({
   SSE_PING_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
   /** Мост из брокера в живой канал. Выключается там, где шлюз поднимают без Kafka. */
   SSE_BRIDGE: z.enum(['on', 'off']).default('on'),
+  /** Рассылка очереди исходящих. Выключается там, где шлюз поднимают без брокера. */
+  OUTBOX_RELAY: z.enum(['on', 'off']).default('on'),
+  OUTBOX_POLL_MS: z.coerce.number().int().min(100).max(60_000).default(500),
+  OUTBOX_BATCH: z.coerce.number().int().min(1).max(500).default(100),
+  /** Срок жизни команды: применять её позже смысла нет, обстановка уже другая. */
+  COMMAND_TTL_MS: z.coerce.number().int().min(5_000).max(3_600_000).default(60_000),
   SSE_RING_SIZE: z.coerce.number().int().min(100).max(50_000).default(5_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });

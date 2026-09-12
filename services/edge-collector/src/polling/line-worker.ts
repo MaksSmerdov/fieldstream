@@ -38,6 +38,8 @@ export interface LineSnapshot {
   readonly port: number;
   readonly baud: number;
   readonly planMode: PlanMode;
+  readonly pollIntervalMs: number;
+  readonly running: boolean;
   readonly connected: boolean;
   readonly reconnectAttempt: number;
   readonly lastCycle: {
@@ -83,7 +85,9 @@ export interface LineWorker {
   readonly runCycle: () => Promise<CycleReport>;
   readonly start: () => void;
   readonly stop: () => Promise<void>;
+  readonly isRunning: () => boolean;
   readonly setPlanMode: (mode: PlanMode) => void;
+  readonly setPollInterval: (ms: number) => void;
   readonly snapshot: () => LineSnapshot;
 }
 
@@ -150,6 +154,7 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
   const throttle = createLogThrottle(clock);
   const plans = new Map<string, ReadPlan>();
   let planMode: PlanMode = 'merged';
+  let pollIntervalMs = line.pollIntervalMs;
   let reconnectAttempt = 0;
   let generation = 0;
   let lastCycle: LineSnapshot['lastCycle'] = null;
@@ -253,7 +258,7 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
     let failed = 0;
 
     if (due.length === 0) {
-      return { outcome: 'idle', durationMs: 0, polled, failed, nextDelayMs: line.pollIntervalMs };
+      return { outcome: 'idle', durationMs: 0, polled, failed, nextDelayMs: pollIntervalMs };
     }
 
     for (const [index, slot] of due.entries()) {
@@ -318,14 +323,14 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
       durationMs,
       polled,
       failed,
-      nextDelayMs: Math.max(0, line.pollIntervalMs - durationMs),
+      nextDelayMs: Math.max(0, pollIntervalMs - durationMs),
     };
   };
 
   /** Обход под сторожевым таймером: зависший обход бросается, соединение рвётся принудительно. */
   const guardedCycle = async (): Promise<CycleReport> => {
     try {
-      return await withHardTimeout(runCycle(), cycleWatchdogMs(line.pollIntervalMs));
+      return await withHardTimeout(runCycle(), cycleWatchdogMs(pollIntervalMs));
     } catch (error) {
       generation += 1;
       link.destroy();
@@ -378,8 +383,12 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
       loop = null;
       link.destroy();
     },
+    isRunning,
     setPlanMode: (mode) => {
       planMode = mode;
+    },
+    setPollInterval: (ms) => {
+      pollIntervalMs = ms;
     },
     snapshot: () => {
       const now = clock.now();
@@ -389,6 +398,8 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
         port: line.port,
         baud: line.baud,
         planMode,
+        pollIntervalMs,
+        running,
         connected: link.isOpen(),
         reconnectAttempt,
         lastCycle,

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
-import type { Producer } from 'kafkajs';
+import type { Kafka, Producer } from 'kafkajs';
 import type { z } from 'zod';
 import type { TopicSpec } from '@fieldstream/contracts';
 import type { Clock } from '@fieldstream/domain';
@@ -27,6 +27,8 @@ const METRICS_INTERVAL_MS = 5_000;
 @Injectable()
 export class KafkaPublisher implements OnModuleInit, OnApplicationShutdown {
   private readonly producer: Producer;
+  /** Клиент брокера: его же переиспользует приём команд, второе подключение тут ни к чему. */
+  public readonly kafka: Kafka;
   private readonly buffer: BoundedPublisher;
   private readonly log: Logger;
   private readonly metrics: CollectorMetrics;
@@ -41,13 +43,12 @@ export class KafkaPublisher implements OnModuleInit, OnApplicationShutdown {
   ) {
     this.log = log;
     this.metrics = metrics;
-    this.producer = createProducer(
-      createKafkaClient({
-        clientId: env.KAFKA_CLIENT_ID,
-        brokers: env.KAFKA_BROKERS,
-        log: createThrottledLog(log, clock),
-      }),
-    );
+    this.kafka = createKafkaClient({
+      clientId: env.KAFKA_CLIENT_ID,
+      brokers: env.KAFKA_BROKERS,
+      log: createThrottledLog(log, clock),
+    });
+    this.producer = createProducer(this.kafka);
     this.producer.on(this.producer.events.CONNECT, () => {
       this.connected = true;
     });

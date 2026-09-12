@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { hostname } from 'node:os';
 import pg from 'pg';
+import { TOPICS } from '@fieldstream/contracts';
 import { ROLES, connectionUrl } from '@fieldstream/db';
 import { SystemClock } from '@fieldstream/domain';
 import { createLogger } from '@fieldstream/nest-common';
@@ -34,6 +35,13 @@ log.info(
     origins: env.CORS_ORIGINS,
   },
   'api-gateway: чтение истории, алармы, живой канал',
+);
+log.info(
+  {
+    consumes: [TOPICS.telemetryReadings.name, TOPICS.deviceState.name, TOPICS.alarmEvents.name],
+    produces: [TOPICS.deviceCommands.name],
+  },
+  'читает показания, состояние и алармы, пишет команды через очередь исходящих',
 );
 log.info({ port: env.GATEWAY_HTTP_PORT }, 'GET /health/live, /health/ready, /metrics, /api/events');
 

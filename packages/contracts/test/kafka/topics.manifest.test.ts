@@ -19,7 +19,7 @@ interface TopicShape {
 const SPECS: readonly TopicShape[] = Object.values(TOPICS);
 
 /** Сервисы, которым вообще разрешено писать в шину. */
-const WRITERS: readonly string[] = ['edge-collector', 'stream-processor'];
+const WRITERS: readonly string[] = ['edge-collector', 'stream-processor', 'api-gateway'];
 
 /** Примеры payload по топикам. Новый топик без примера не соберётся: тип требует все ключи. */
 const SAMPLES: { readonly [K in TopicKey]: PayloadOf<K> } = {
@@ -87,6 +87,31 @@ const SAMPLES: { readonly [K in TopicKey]: PayloadOf<K> } = {
     threshold: -15,
     boundary: 'max',
     occurredAt: TS,
+    traceId: TRACE_ID,
+  },
+  deviceCommands: {
+    schema: 'device.command',
+    v: 1,
+    commandId: 'b3f1c2d4-5e6a-4b7c-8d9e-0f1a2b3c4d5e',
+    issuedBy: 'engineer@fieldstream.local',
+    siteCode: 'SITE-A',
+    lineCode: 'L1',
+    kind: 'line.set_poll_interval',
+    args: { pollIntervalMs: 15_000 },
+    issuedAt: TS,
+    expiresAt: TS,
+    traceId: TRACE_ID,
+  },
+  commandResults: {
+    schema: 'device.command.result',
+    v: 1,
+    commandId: 'b3f1c2d4-5e6a-4b7c-8d9e-0f1a2b3c4d5e',
+    siteCode: 'SITE-A',
+    lineCode: 'L1',
+    kind: 'line.set_poll_interval',
+    status: 'applied',
+    detail: 'такт опроса линии L1 теперь 15000 мс',
+    appliedAt: TS,
     traceId: TRACE_ID,
   },
   telemetryRawDlq: new Uint8Array([0x7b, 0xff, 0x00]),

@@ -92,12 +92,43 @@ export class LinesService implements OnApplicationBootstrap, BeforeApplicationSh
     return this.workers.map((worker) => worker.snapshot());
   }
 
+  /** Обслуживает ли этот сборщик такую линию: чужие команды он молча пропускает. */
+  public owns(lineCode: string): boolean {
+    return this.workers.some((candidate) => candidate.lineCode === lineCode);
+  }
+
   /** Переключает режим плана чтения линии. Ложь, если такой линии у сборщика нет. */
   public setPlanMode(lineCode: string, mode: PlanMode): boolean {
     const worker = this.workers.find((candidate) => candidate.lineCode === lineCode);
     if (worker === undefined) return false;
     worker.setPlanMode(mode);
     this.log.info({ line: lineCode, mode }, 'режим плана чтения изменён');
+    return true;
+  }
+
+  /** Такт опроса линии. Новое значение действует со следующего обхода, текущий не прерывается. */
+  public setPollInterval(lineCode: string, pollIntervalMs: number): boolean {
+    const worker = this.workers.find((candidate) => candidate.lineCode === lineCode);
+    if (worker === undefined) return false;
+    worker.setPollInterval(pollIntervalMs);
+    this.log.info({ line: lineCode, pollIntervalMs }, 'такт опроса изменён');
+    return true;
+  }
+
+  public enable(lineCode: string): boolean {
+    const worker = this.workers.find((candidate) => candidate.lineCode === lineCode);
+    if (worker === undefined) return false;
+    worker.start();
+    this.log.info({ line: lineCode }, 'опрос линии включён');
+    return true;
+  }
+
+  /** Остановка линии: текущий обход дорабатывает, новый не начинается, порт закрывается. */
+  public disable(lineCode: string): boolean {
+    const worker = this.workers.find((candidate) => candidate.lineCode === lineCode);
+    if (worker === undefined) return false;
+    void worker.stop();
+    this.log.info({ line: lineCode }, 'опрос линии остановлен');
     return true;
   }
 }
