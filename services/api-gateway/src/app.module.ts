@@ -10,6 +10,7 @@ import { AuthService } from './auth/auth.service.js';
 import { MeController } from './auth/me.controller.js';
 import type { Env } from './config/env.js';
 import { EventsController } from './events/events.controller.js';
+import { KafkaBridgeService } from './events/kafka-bridge.service.js';
 import { LiveBusService } from './events/live-bus.service.js';
 import { HealthController } from './http/health.controller.js';
 import { MetricsController } from './http/metrics.controller.js';
@@ -54,6 +55,7 @@ export class AppModule {
         { provide: APP_GUARD, useClass: AuthGuard },
         AuthService,
         LiveBusService,
+        KafkaBridgeService,
       ],
     };
   }

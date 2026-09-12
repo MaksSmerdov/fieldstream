@@ -101,6 +101,7 @@ beforeAll(async () => {
       REFRESH_REUSE_WINDOW_MS: String(REUSE_WINDOW_MS),
       LOGIN_ATTEMPTS: '5',
       LOGIN_REFILL_MS: '30000',
+      SSE_BRIDGE: 'off',
     }),
     log: createLogger('api-gateway', 'fatal'),
     clock,

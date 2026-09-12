@@ -32,7 +32,12 @@ beforeAll(async () => {
   accessToken = issued.token;
 
   app = await createApp({
-    env: loadEnv({ FS_API_PASSWORD: 'тест', SSE_PING_MS: '1000', AUTH_SECRET: SECRET }),
+    env: loadEnv({
+      FS_API_PASSWORD: 'тест',
+      SSE_PING_MS: '1000',
+      AUTH_SECRET: SECRET,
+      SSE_BRIDGE: 'off',
+    }),
     log: createLogger('api-gateway', 'fatal'),
     clock,
     metrics: createMetrics(),

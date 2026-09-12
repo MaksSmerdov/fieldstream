@@ -1,12 +1,14 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
 import type pg from 'pg';
 import { Public } from '../auth/auth.guard.js';
+import { KafkaBridgeService } from '../events/kafka-bridge.service.js';
 import { LiveBusService } from '../events/live-bus.service.js';
 import { POOL } from '../tokens.js';
 
 interface Readiness {
   readonly status: 'ready' | 'starting';
   readonly database: boolean;
+  readonly broker: boolean;
   readonly streams: number;
 }
 
@@ -17,6 +19,7 @@ export class HealthController {
   public constructor(
     @Inject(POOL) private readonly pool: pg.Pool,
     private readonly bus: LiveBusService,
+    private readonly bridge: KafkaBridgeService,
   ) {}
 
   @Get('live')
@@ -30,9 +33,11 @@ export class HealthController {
       .query('SELECT 1')
       .then(() => true)
       .catch(() => false);
+    const broker = this.bridge.isRunning();
     const readiness: Readiness = {
-      status: database ? 'ready' : 'starting',
+      status: database && broker ? 'ready' : 'starting',
       database,
+      broker,
       streams: this.bus.openStreams(),
     };
 

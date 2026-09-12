@@ -39,6 +39,8 @@ const envSchema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
   SSE_PING_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
+  /** Мост из брокера в живой канал. Выключается там, где шлюз поднимают без Kafka. */
+  SSE_BRIDGE: z.enum(['on', 'off']).default('on'),
   SSE_RING_SIZE: z.coerce.number().int().min(100).max(50_000).default(5_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
