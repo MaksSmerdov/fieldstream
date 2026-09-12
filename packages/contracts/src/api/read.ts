@@ -11,6 +11,7 @@ import {
 import { healthReasonSchema, healthStatusSchema } from '../messages/health.js';
 import { deviceModeSchema, planModeSchema, registerTypeSchema } from '../topology/device.js';
 import { severitySchema } from '../messages/alarms.js';
+import { deviceEventKindSchema } from '../messages/events.js';
 
 /** Прибор в дереве объектов: адрес, состояние и сколько у него незакрытых алармов. */
 export const topologyDeviceSchema = z
@@ -253,3 +254,40 @@ export const deviceProfileViewSchema = z
   })
   .strict();
 export type DeviceProfileView = z.infer<typeof deviceProfileViewSchema>;
+
+/** Отрезок режима на шкале времени: из них складывается полоса под графиком. */
+export const modeSpanSchema = z
+  .object({ mode: deviceModeSchema, from: isoTimestampSchema, to: isoTimestampSchema })
+  .strict();
+export type ModeSpan = z.infer<typeof modeSpanSchema>;
+
+export const deviceEventItemSchema = z
+  .object({
+    kind: deviceEventKindSchema,
+    occurredAt: isoTimestampSchema,
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+export type DeviceEventItem = z.infer<typeof deviceEventItemSchema>;
+
+/**
+ * Происшествия прибора за окно. Отрезки режимов считает сервер: режим на начало окна
+ * определяется последней сменой до него, и без этой строки первый отрезок пришлось бы
+ * додумывать на фронте.
+ */
+export const deviceEventsResponseSchema = z
+  .object({
+    deviceCode: deviceCodeSchema,
+    from: isoTimestampSchema,
+    to: isoTimestampSchema,
+    spans: z.array(modeSpanSchema),
+    events: z.array(deviceEventItemSchema),
+    serverTime: isoTimestampSchema,
+  })
+  .strict();
+export type DeviceEventsResponse = z.infer<typeof deviceEventsResponseSchema>;
+
+export const deviceEventsQuerySchema = z
+  .object({ from: isoTimestampSchema, to: isoTimestampSchema })
+  .strict();
+export type DeviceEventsQuery = z.infer<typeof deviceEventsQuerySchema>;

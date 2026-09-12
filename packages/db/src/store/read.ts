@@ -1,11 +1,14 @@
 import type pg from 'pg';
 import type {
+  DeviceEventKind,
+  DeviceMode,
   DeviceSnapshot,
   SeriesMetric,
   SeriesSource,
   Severity,
   TopologySite,
 } from '@fieldstream/contracts';
+import { deviceModeSchema } from '@fieldstream/contracts';
 import { qualityOf } from './writer.js';
 
 interface TopologyRow {
@@ -379,5 +382,84 @@ export const loadBootFacts = async (client: pg.ClientBase): Promise<BootFacts> =
             progressPct: row.seed_pct ?? 0,
             detail: row.seed_detail,
           },
+  };
+};
+
+export interface DeviceEventsRequest {
+  readonly deviceCode: string;
+  readonly from: string;
+  readonly to: string;
+  readonly limit: number;
+}
+
+export interface DeviceEventsData {
+  readonly initialMode: DeviceMode;
+  readonly changes: readonly { readonly at: string; readonly mode: DeviceMode }[];
+  readonly events: readonly {
+    readonly kind: DeviceEventKind;
+    readonly occurredAt: string;
+    readonly payload: Record<string, unknown>;
+  }[];
+}
+
+interface DeviceEventRow {
+  readonly kind: DeviceEventKind;
+  readonly occurred_at: Date;
+  readonly payload: Record<string, unknown>;
+}
+
+/**
+ * Происшествия прибора за окно плюс режим на его начало. Режим до окна берётся из последней
+ * смены раньше него, а если смен не было вовсе, из текущего состояния: полоса режимов обязана
+ * покрывать окно целиком, иначе её начало пришлось бы додумывать.
+ */
+export const loadDeviceEvents = async (
+  client: pg.ClientBase,
+  request: DeviceEventsRequest,
+): Promise<DeviceEventsData | null> => {
+  const device = await client.query<{ device_id: number; mode: DeviceMode | null }>(
+    `SELECT d.id AS device_id, st.mode
+     FROM core.devices d
+     LEFT JOIN core.device_state st ON st.device_id = d.id
+     WHERE d.code = $1`,
+    [request.deviceCode],
+  );
+  const row = device.rows[0];
+  if (row === undefined) return null;
+
+  const before = await client.query<{ mode: string | null }>(
+    `SELECT payload ->> 'to' AS mode
+     FROM core.device_events
+     WHERE device_id = $1 AND kind = 'mode_changed' AND occurred_at <= $2
+     ORDER BY occurred_at DESC LIMIT 1`,
+    [row.device_id, request.from],
+  );
+
+  const inside = await client.query<DeviceEventRow>(
+    `SELECT kind, occurred_at, payload
+     FROM core.device_events
+     WHERE device_id = $1 AND occurred_at > $2 AND occurred_at <= $3
+     ORDER BY occurred_at LIMIT $4`,
+    [row.device_id, request.from, request.to, request.limit],
+  );
+
+  const events = inside.rows.map((event) => ({
+    kind: event.kind,
+    occurredAt: event.occurred_at.toISOString(),
+    payload: event.payload,
+  }));
+
+  const beforeMode = deviceModeSchema.safeParse(before.rows[0]?.mode);
+
+  return {
+    initialMode: beforeMode.success ? beforeMode.data : (row.mode ?? 'cooling'),
+    changes: events.flatMap((event) => {
+      const mode = deviceModeSchema.safeParse(event.payload['to']);
+
+      return event.kind === 'mode_changed' && mode.success
+        ? [{ at: event.occurredAt, mode: mode.data }]
+        : [];
+    }),
+    events,
   };
 };

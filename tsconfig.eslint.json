@@ -16,7 +16,7 @@
     "packages/*/vitest*.ts",
     "tools/*/src/**/*.ts",
     "tools/*/test/**/*.ts",
-    "tools/*/vitest.config.ts",
+    "tools/*/vitest*.ts",
     "services/**/*.ts"
   ]
 }

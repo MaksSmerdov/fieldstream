@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { z } from 'zod';
 import {
+  deviceEventsResponseSchema,
   deviceSnapshotSchema,
   readPlanResponseSchema,
   seriesResponseSchema,
@@ -200,7 +201,11 @@ describe('чтение через шлюз', () => {
     expect((await get('/api/devices/RC-999/latest', deviceSnapshotSchema)).status).toBe(404);
   });
 
-  it('короткое окно читается из сырых строк', async () => {
+  /**
+   * Час десятисекундных данных в шестьдесят точек это прореживание, и ответ обязан признать
+   * его сам: подпись под графиком читает признак из ответа, а не догадывается по числу точек.
+   */
+  it('короткое окно читается из сырых строк и признаётся прореженным', async () => {
     const from = new Date(windowFrom.getTime() + 3_600_000).toISOString();
     const to = new Date(windowFrom.getTime() + 2 * 3_600_000).toISOString();
     const { body } = await get(
@@ -209,8 +214,21 @@ describe('чтение через шлюз', () => {
     );
 
     expect(body?.meta.source).toBe('readings');
-    expect(body?.meta.truncated).toBe(false);
+    expect(body?.meta.bucketMs).toBe(60_000);
+    expect(body?.meta.truncated).toBe(true);
     expect(body?.metrics[0]?.points.length).toBeGreaterThan(0);
+  });
+
+  it('то же окно с запасом точек идёт шагом источника и прореженным не считается', async () => {
+    const from = new Date(windowFrom.getTime() + 3_600_000).toISOString();
+    const to = new Date(windowFrom.getTime() + 2 * 3_600_000).toISOString();
+    const { body } = await get(
+      `/api/devices/${DEVICE}/series?metrics=${METRIC}&from=${from}&to=${to}&maxPoints=400`,
+      seriesResponseSchema,
+    );
+
+    expect(body?.meta.bucketMs).toBe(10_000);
+    expect(body?.meta.truncated).toBe(false);
   });
 
   /**
@@ -272,6 +290,58 @@ describe('чтение через шлюз', () => {
     expect(merged.body?.requests).toBe(4);
     expect(naive.body?.requests).toBe(9);
     expect(merged.body?.registers).toBe(naive.body?.registers);
+  });
+
+  /**
+   * Полоса режимов обязана покрывать окно целиком: дыра в ней читалась бы как «режим
+   * неизвестен», хотя прибор всё это время был в каком-то режиме.
+   */
+  it('оттайка внутри окна режет полосу режимов на три встык идущих отрезка', async () => {
+    const startedAt = new Date(windowFrom.getTime() + 3_600_000);
+    const finishedAt = new Date(startedAt.getTime() + 20 * 60_000);
+
+    await owner.query(
+      `INSERT INTO core.device_events (device_id, kind, payload, occurred_at)
+       SELECT d.id, 'mode_changed', $2::jsonb, $3::timestamptz FROM core.devices d WHERE d.code = $1
+       UNION ALL
+       SELECT d.id, 'mode_changed', $4::jsonb, $5::timestamptz FROM core.devices d WHERE d.code = $1
+       ON CONFLICT DO NOTHING`,
+      [
+        DEVICE,
+        JSON.stringify({ from: 'cooling', to: 'defrost' }),
+        startedAt.toISOString(),
+        JSON.stringify({ from: 'defrost', to: 'cooling' }),
+        finishedAt.toISOString(),
+      ],
+    );
+
+    const from = windowFrom.toISOString();
+    const to = windowTo.toISOString();
+    const { status, body } = await get(
+      `/api/devices/${DEVICE}/events?from=${from}&to=${to}`,
+      deviceEventsResponseSchema,
+    );
+
+    expect(status).toBe(200);
+    expect(body?.spans.map((span) => span.mode)).toEqual(['cooling', 'defrost', 'cooling']);
+    expect(body?.spans[0]?.from).toBe(from);
+    expect(body?.spans[1]?.from).toBe(startedAt.toISOString());
+    expect(body?.spans[1]?.to).toBe(finishedAt.toISOString());
+    expect(body?.spans.at(-1)?.to).toBe(to);
+    expect(body?.events).toHaveLength(2);
+  });
+
+  /** Смена до окна в него не попадает, но режим на начало окна задаёт именно она. */
+  it('окно после оттайки начинается с того режима, в котором прибор уже был', async () => {
+    const from = new Date(windowFrom.getTime() + 2 * 3_600_000).toISOString();
+    const { body } = await get(
+      `/api/devices/${DEVICE}/events?from=${from}&to=${windowTo.toISOString()}`,
+      deviceEventsResponseSchema,
+    );
+
+    expect(body?.spans).toHaveLength(1);
+    expect(body?.spans[0]?.mode).toBe('cooling');
+    expect(body?.events).toHaveLength(0);
   });
 
   it('без токена чтение закрыто', async () => {

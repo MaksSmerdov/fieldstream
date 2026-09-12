@@ -14,6 +14,7 @@ export interface SeedOptions {
 export interface SeedReport {
   readonly readings: number;
   readonly alarms: number;
+  readonly defrosts: number;
   readonly from: string;
   readonly to: string;
 }
@@ -59,9 +60,61 @@ export const seedHistory = async (
     options.onProgress?.('readings', index + 1, waves.length);
   }
 
+  const defrosts = await seedDefrosts(client, from, to);
   const alarms = await seedIncidents(client, to);
 
-  return { readings, alarms, from: from.toISOString(), to: to.toISOString() };
+  return { readings, alarms, defrosts, from: from.toISOString(), to: to.toISOString() };
+};
+
+/** Оттайка раз в шесть часов и сколько она длится: полоса режимов на экране рисуется по этим событиям. */
+const DEFROST_PERIOD_HOURS = 6;
+const DEFROST_MINUTES = 20;
+
+/**
+ * Оттайки в истории. Без них полоса режимов на графике была бы ровной, а подъём температуры
+ * испарителя нечем объяснить: событие и сами значения ставятся вместе, иначе полоса и кривая
+ * рассказывали бы об одном часе разное. Значения правятся только на окнах, созданных этим же
+ * запуском: иначе повторный засев поднимал бы температуру второй раз поверх первой.
+ */
+const seedDefrosts = async (client: pg.ClientBase, from: Date, to: Date): Promise<number> => {
+  const startedAt = `g.ts + make_interval(hours => (d.id % ${String(DEFROST_PERIOD_HOURS)})::int)`;
+  const window = `INTERVAL '${String(DEFROST_MINUTES)} minutes'`;
+
+  const change = async (
+    at: string,
+    fromMode: string,
+    toMode: string,
+  ): Promise<{ deviceId: number; startedAt: Date }[]> => {
+    const result = await client.query<{ device_id: number; occurred_at: Date }>(
+      `INSERT INTO core.device_events (device_id, kind, payload, occurred_at)
+       SELECT d.id, 'mode_changed', jsonb_build_object('from', $3::text, 'to', $4::text), ${at}
+       FROM generate_series($1::timestamptz, $2::timestamptz,
+                            INTERVAL '${String(DEFROST_PERIOD_HOURS)} hours') AS g(ts)
+       CROSS JOIN core.devices d
+       WHERE d.profile_key = 'rc-2000' AND ${at} < $2::timestamptz
+       ON CONFLICT DO NOTHING
+       RETURNING device_id, occurred_at`,
+      [from.toISOString(), to.toISOString(), fromMode, toMode],
+    );
+
+    return result.rows.map((row) => ({ deviceId: row.device_id, startedAt: row.occurred_at }));
+  };
+
+  const started = await change(startedAt, 'cooling', 'defrost');
+  await change(`${startedAt} + ${window}`, 'defrost', 'cooling');
+  if (started.length === 0) return 0;
+
+  await client.query(
+    `UPDATE ts.readings r
+     SET value = round((r.value + CASE r.metric_key
+           WHEN 'evap_temp_c' THEN 7.0 ELSE 2.5 END)::numeric, 1)::float8
+     FROM unnest($1::int[], $2::timestamptz[]) AS w(device_id, started_at)
+     WHERE r.device_id = w.device_id AND r.metric_key IN ('evap_temp_c', 'supply_temp_c')
+       AND r.ts >= w.started_at AND r.ts < w.started_at + ${window}`,
+    [started.map((item) => item.deviceId), started.map((item) => item.startedAt.toISOString())],
+  );
+
+  return started.length;
 };
 
 /** Окно происшествия в истории: значения за уставкой плюс сам эпизод аларма. */

@@ -12,6 +12,7 @@ import {
 import type pg from 'pg';
 import {
   alarmRulesUpdateSchema,
+  deviceEventsQuerySchema,
   pickSource,
   planModeSchema,
   seriesQuerySchema,
@@ -19,6 +20,7 @@ import {
 import type {
   AlarmRulesResponse,
   AlarmRulesUpdateResponse,
+  DeviceEventsResponse,
   DeviceProfileView,
   DeviceSnapshot,
   ReadPlanResponse,
@@ -26,12 +28,13 @@ import type {
 } from '@fieldstream/contracts';
 import {
   loadDeviceAlarmRules,
+  loadDeviceEvents,
   loadDeviceSnapshot,
   loadSeries,
   updateDeviceAlarmRules,
 } from '@fieldstream/db';
 import { buildDeviceReadPlan, profileByVersion } from '@fieldstream/device-profiles';
-import { toIsoTimestamp } from '@fieldstream/domain';
+import { buildModeSpans, toIsoTimestamp } from '@fieldstream/domain';
 import type { Clock } from '@fieldstream/domain';
 import { CurrentUser, RequirePermission } from '../auth/auth.guard.js';
 import type { AccessClaims } from '../auth/tokens.js';
@@ -40,6 +43,9 @@ import { CLOCK, POOL } from '../tokens.js';
 
 /** Сколько тактов опроса подряд можно не получать данные, прежде чем снимок считается устаревшим. */
 const STALE_CYCLES = 3;
+
+/** Потолок происшествий за окно: неделя оттаек на дюжине приборов в него укладывается с запасом. */
+const EVENTS_LIMIT = 500;
 
 @Controller('devices')
 export class DevicesController {
@@ -108,6 +114,44 @@ export class DevicesController {
         from: parsed.data.from,
         to: parsed.data.to,
       },
+    };
+  }
+
+  /**
+   * Происшествия прибора за окно и полоса режимов по ним. Отрезки считает сервер: режим
+   * на начало окна известен только базе, а без него первый отрезок пришлось бы додумывать.
+   */
+  @Get(':code/events')
+  @RequirePermission('devices')
+  public async events(
+    @Param('code') code: string,
+    @Query() query: unknown,
+  ): Promise<DeviceEventsResponse> {
+    const parsed = deviceEventsQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.issues.map((issue) => issue.message));
+    }
+    if (Date.parse(parsed.data.to) <= Date.parse(parsed.data.from)) {
+      throw new BadRequestException('конец окна должен быть позже начала');
+    }
+
+    const data = await withClient(this.pool, (client) =>
+      loadDeviceEvents(client, { deviceCode: code, ...parsed.data, limit: EVENTS_LIMIT }),
+    );
+    if (data === null) throw new NotFoundException(`прибора ${code} нет в топологии`);
+
+    return {
+      deviceCode: code,
+      from: parsed.data.from,
+      to: parsed.data.to,
+      spans: buildModeSpans({
+        from: parsed.data.from,
+        to: parsed.data.to,
+        initialMode: data.initialMode,
+        changes: data.changes,
+      }),
+      events: [...data.events],
+      serverTime: toIsoTimestamp(this.clock.now()),
     };
   }
 
