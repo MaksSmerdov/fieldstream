@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AlarmsResponse, TopologyResponse } from '@fieldstream/contracts';
+import type { AlarmsResponse, DeviceSnapshot, TopologyResponse } from '@fieldstream/contracts';
 import { queryKeys } from '../src/shared/api/query-keys.js';
 import { useSessionStore } from '../src/shared/auth/session-store.js';
 import { useLiveStore } from '../src/shared/sse/live-store.js';
@@ -232,6 +232,116 @@ describe('живой канал', () => {
     expect(deviceOf(client.getQueryData<TopologyResponse>(queryKeys.topology))?.activeAlarms).toBe(
       1,
     );
+  });
+
+  /**
+   * У каждой открытой ленты свои фильтры, и они лежат прямо в ключе кэша. Снятый эпизод
+   * обязан уйти из ленты незакрытых, а чужой прибор не должен появиться в ленте,
+   * отфильтрованной по своему: иначе на экране появляются строки, которых там быть не может.
+   */
+  it('живой аларм попадает только в те ленты, под фильтры которых он подходит', () => {
+    renderHook(
+      () => {
+        useLivePatch([]);
+      },
+      { wrapper },
+    );
+    const source = FakeEventSource.latest();
+    source.open();
+    source.emit(
+      'hello',
+      { serverTime: '2026-02-11T10:00:00.000Z', epoch: 7, pingMs: PING_MS },
+      '7:1',
+    );
+
+    const empty = { items: [], nextCursor: null, serverTime: '2026-02-11T10:00:00.000Z' };
+    const pageOf = (key: readonly unknown[]): void => {
+      client.setQueryData<InfiniteData<AlarmsResponse>>(key, {
+        pageParams: [null],
+        pages: [{ ...empty }],
+      });
+    };
+    pageOf(queryKeys.alarms({ state: 'active' }));
+    pageOf(queryKeys.alarms({ state: 'cleared' }));
+    pageOf(queryKeys.alarms({ device: 'RC-102' }));
+
+    const raised = {
+      alarmId: '4dca8f38-ab30-5a9a-9872-97a025cb6167',
+      dedupeKey: 'RC-101|supply_temp_c|cooling|2026-02-11T10:00:00.000Z',
+      deviceCode: 'RC-101',
+      metricKey: 'supply_temp_c',
+      mode: 'cooling',
+      state: 'raised',
+      severity: 'warning',
+      value: 4.2,
+      threshold: 2,
+      boundary: 'max',
+      occurredAt: '2026-02-11T10:00:00.000Z',
+    };
+
+    source.emit('alarm', raised, '7:2');
+
+    const itemsOf = (key: readonly unknown[]): number =>
+      client.getQueryData<InfiniteData<AlarmsResponse>>(key)?.pages[0]?.items.length ?? -1;
+
+    expect(itemsOf(queryKeys.alarms({ state: 'active' }))).toBe(1);
+    expect(itemsOf(queryKeys.alarms({ state: 'cleared' }))).toBe(0);
+    expect(itemsOf(queryKeys.alarms({ device: 'RC-102' }))).toBe(0);
+
+    source.emit('alarm', { ...raised, state: 'cleared' }, '7:3');
+
+    expect(itemsOf(queryKeys.alarms({ state: 'active' }))).toBe(0);
+  });
+
+  /** Чип «активных алармов» на экране прибора берётся из снимка, а не из дерева объектов. */
+  it('живой аларм правит счётчик в снимке прибора', () => {
+    client.setQueryData(queryKeys.snapshot('RC-101'), {
+      deviceCode: 'RC-101',
+      label: 'Камера',
+      lineCode: 'L1',
+      siteCode: 'SITE-A',
+      profileKey: 'rc-2000',
+      profileVersion: 1,
+      status: 'online',
+      reason: 'ok',
+      mode: 'cooling',
+      since: null,
+      lastOkAt: null,
+      consecutiveErrors: 0,
+      stale: false,
+      ts: null,
+      metrics: [],
+      activeAlarms: 0,
+      serverTime: '2026-02-11T10:00:00.000Z',
+    });
+    renderHook(
+      () => {
+        useLivePatch([]);
+      },
+      { wrapper },
+    );
+    const source = FakeEventSource.latest();
+    source.open();
+
+    source.emit(
+      'alarm',
+      {
+        alarmId: '4dca8f38-ab30-5a9a-9872-97a025cb6167',
+        dedupeKey: 'RC-101|supply_temp_c|cooling|2026-02-11T10:00:00.000Z',
+        deviceCode: 'RC-101',
+        metricKey: 'supply_temp_c',
+        mode: 'cooling',
+        state: 'raised',
+        severity: 'warning',
+        value: 4.2,
+        threshold: 2,
+        boundary: 'max',
+        occurredAt: '2026-02-11T10:00:00.000Z',
+      },
+      '7:4',
+    );
+
+    expect(client.getQueryData<DeviceSnapshot>(queryKeys.snapshot('RC-101'))?.activeAlarms).toBe(1);
   });
 
   /** Сервер замолчал, но браузер считает соединение живым: своё переоткрытие обязательно. */

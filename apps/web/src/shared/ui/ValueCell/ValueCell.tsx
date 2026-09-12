@@ -17,6 +17,7 @@ const DASH = '–';
 /**
  * Значение прибора. Протухшее значение рисуется прочерком, а не последним известным числом:
  * старое число выглядит как правда и вводит в заблуждение сильнее, чем честный прочерк.
+ * Причина прочерка лежит рядом невидимым текстом: подсказка по наведению есть только у мыши.
  */
 export const ValueCell = ({
   value,
@@ -27,9 +28,14 @@ export const ValueCell = ({
   states,
 }: Props): React.JSX.Element => {
   if (value === null || stale || quality === 'bad') {
+    const reason = stale ? 'данные устарели' : 'значение недостоверно';
+
     return (
-      <Tooltip title={stale ? 'данные устарели' : 'значение недостоверно'} arrow>
-        <span className={styles['value_stale']}>{DASH}</span>
+      <Tooltip title={reason} arrow describeChild>
+        <span className={styles['value_stale']}>
+          {DASH}
+          <span className={styles['value__aside']}>{reason}</span>
+        </span>
       </Tooltip>
     );
   }
@@ -40,14 +46,15 @@ export const ValueCell = ({
     return <span className={styles['value']}>{text ?? String(value)}</span>;
   }
 
-  const shown = value.toFixed(precision);
-  const title = quality === 'substituted' ? 'значение подставлено фильтром скачков' : '';
+  const shown = `${value.toFixed(precision)}${unit == null ? '' : ` ${unit}`}`;
+
+  if (quality !== 'substituted') return <span className={styles['value']}>{shown}</span>;
 
   return (
-    <Tooltip title={title} arrow disableHoverListener={title === ''}>
-      <span className={quality === 'substituted' ? styles['value_substituted'] : styles['value']}>
+    <Tooltip title="значение подставлено фильтром скачков" arrow describeChild>
+      <span className={styles['value_substituted']}>
         {shown}
-        {unit == null ? '' : ` ${unit}`}
+        <span className={styles['value__aside']}>подставлено фильтром скачков</span>
       </span>
     </Tooltip>
   );

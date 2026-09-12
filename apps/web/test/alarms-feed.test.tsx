@@ -191,6 +191,24 @@ describe('лента алармов', () => {
     expect(screen.getAllByText('не подтверждён').length).toBeGreaterThan(0);
   });
 
+  /**
+   * Объявитель нужен для живых событий. Смена фильтра приносит другой набор строк, и без
+   * привязки к фильтру первая строка нового набора объявлялась бы как только что случившийся
+   * аларм, хотя он мог произойти вчера.
+   */
+  it('смена фильтра ничего не объявляет вслух', async () => {
+    stubFetch();
+    show();
+    await screen.findAllByRole('button', { name: 'Подтвердить' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'незакрытые' }));
+
+    await waitFor(() => {
+      expect(calls.some((call) => call.includes('state=active'))).toBe(true);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('');
+  });
+
   /** Страница берётся курсором: при смещении новый эпизод сдвинул бы ленту и повторил конец. */
   it('следующая страница просится курсором, а не смещением', async () => {
     stubFetch({ nextCursor: 'курсор' });

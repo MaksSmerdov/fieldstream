@@ -9,6 +9,8 @@ const PAGE_SIZE = 50;
 export interface AlarmFeed {
   readonly items: readonly AlarmListItem[];
   readonly serverTime: string | undefined;
+  /** Страницы хоть раз пришли: неудачная догрузка не повод убирать ленту с экрана. */
+  readonly hasData: boolean;
   readonly isPending: boolean;
   readonly isError: boolean;
   readonly error: unknown;
@@ -39,6 +41,7 @@ export const useAlarmFeed = (filters: Partial<AlarmsQuery>): AlarmFeed => {
   return {
     items: query.data?.pages.flatMap((page) => page.items) ?? [],
     serverTime: query.data?.pages[0]?.serverTime,
+    hasData: query.data !== undefined,
     isPending: query.isPending,
     isError: query.isError,
     error: query.error,

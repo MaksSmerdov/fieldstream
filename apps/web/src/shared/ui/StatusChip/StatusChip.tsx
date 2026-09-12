@@ -1,6 +1,7 @@
 import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
 import type { HealthReason, HealthStatus } from '@fieldstream/contracts';
+import { agoText, momentText } from '../../time/human-time.js';
 import styles from './StatusChip.module.scss';
 
 interface Props {
@@ -36,15 +37,20 @@ const LABEL: Readonly<Record<HealthStatus, string>> = {
   unknown: 'неизвестно',
 };
 
+/**
+ * Статус прибора с объяснением. Подсказка описывает сам чип, а не подменяет его имя:
+ * подпись на теге без роли вспомогательные программы просто не читают, и причина статуса
+ * пропала бы для того, кому она нужнее всего.
+ */
 export const StatusChip = ({ status, reason, since, lastOkAt }: Props): React.JSX.Element => {
   const lines = [
     `причина: ${REASON_TEXT[reason]}`,
-    since == null ? null : `с ${since}`,
-    lastOkAt == null ? null : `последний удачный опрос ${lastOkAt}`,
+    since == null ? null : `в этом состоянии ${agoText(since, 'неизвестно сколько')}`,
+    lastOkAt == null ? null : `последний удачный опрос ${momentText(lastOkAt)}`,
   ].filter((line): line is string => line !== null);
 
   return (
-    <Tooltip title={lines.join('\n')} arrow>
+    <Tooltip title={lines.join('. ')} arrow describeChild>
       <Chip
         size="small"
         color={COLOR[status]}

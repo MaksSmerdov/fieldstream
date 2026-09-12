@@ -9,7 +9,7 @@ interface Props {
 
 /** Сводка стенда одной строкой: сколько приборов, сколько в сети, сколько просит внимания. */
 export const SummaryBar = ({ summary }: Props): React.JSX.Element => (
-  <Paper className={styles['summary']} elevation={0}>
+  <Paper className={styles['summary']} elevation={0} role="group" aria-label="Сводка по стенду">
     {[
       { label: 'приборов', value: summary.devices, tone: 'plain' as const },
       { label: 'в сети', value: summary.online, tone: 'good' as const },

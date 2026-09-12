@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type { ModeSpan, SeriesMeta, SeriesMetric } from '@fieldstream/contracts';
 import { api } from '../../../shared/api/endpoints.js';
 import { queryKeys } from '../../../shared/api/query-keys.js';
@@ -39,6 +39,8 @@ const MAX_POINTS = 800;
 export interface SeriesWindow {
   readonly from: string;
   readonly to: string;
+  /** Точки хоть раз пришли: неудачный перезапрос не повод убирать график с экрана. */
+  readonly hasData: boolean;
   readonly metrics: readonly SeriesMetric[];
   readonly meta: SeriesMeta | undefined;
   readonly spans: readonly ModeSpan[];
@@ -81,20 +83,25 @@ export const useSeriesWindow = (
   const metrics = useMemo(() => [...metricKeys].sort(), [metricKeys]);
   const enabled = metrics.length > 0;
 
+  // Правый край окна двигается сам, и ключ запроса при этом меняется. Без переноса прежних
+  // точек график на секунду заменялся бы заглушкой каждую минуту, хотя данные почти те же
   const series = useQuery({
     queryKey: queryKeys.series(code, metrics, from, to),
     queryFn: () => api.series(code, { metrics, from, to, maxPoints: MAX_POINTS }),
     enabled,
+    placeholderData: keepPreviousData,
   });
 
   const events = useQuery({
     queryKey: queryKeys.deviceEvents(code, from, to),
     queryFn: () => api.deviceEvents(code, { from, to }),
+    placeholderData: keepPreviousData,
   });
 
   return {
     from,
     to,
+    hasData: series.data !== undefined || !enabled,
     metrics: series.data?.metrics ?? [],
     meta: series.data?.meta,
     spans: events.data?.spans ?? [],

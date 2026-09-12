@@ -3,12 +3,13 @@ import { SummaryBar } from '../features/topology/components/SummaryBar/SummaryBa
 import { TopologyTree } from '../features/topology/components/TopologyTree/TopologyTree.js';
 import { useTopologyRows } from '../features/topology/hooks/useTopologyRows.js';
 import { EmptyState } from '../shared/ui/EmptyState/EmptyState.js';
+import { ErrorBanner } from '../shared/ui/ErrorBanner/ErrorBanner.js';
 import { ErrorState } from '../shared/ui/ErrorState/ErrorState.js';
 import { SkeletonBlock } from '../shared/ui/SkeletonBlock/SkeletonBlock.js';
 
 /** Обзор стенда: сводка сверху, дерево объектов ниже. Состояния экрана честные, все четыре. */
 export const OverviewPage = (): React.JSX.Element => {
-  const { rows, summary, isPending, isError, error, refetch } = useTopologyRows();
+  const { rows, summary, hasData, isPending, isError, error, refetch } = useTopologyRows();
 
   return (
     <>
@@ -18,18 +19,22 @@ export const OverviewPage = (): React.JSX.Element => {
 
       {isPending ? <SkeletonBlock rows={6} height={48} label="Загружаем стенд" /> : null}
 
-      {isError ? <ErrorState error={error} onRetry={refetch} /> : null}
+      {isError && !hasData ? <ErrorState error={error} onRetry={refetch} /> : null}
 
-      {!isPending && !isError && rows.length === 0 ? (
+      {isError && hasData ? <ErrorBanner error={error} onRetry={refetch} /> : null}
+
+      {/* Пустота считается по приборам, а не по рядам: площадка с линиями и без единого
+          прибора дала бы дерево из одних заголовков, и это выглядело бы поломкой */}
+      {!isPending && hasData && summary.devices === 0 ? (
         <EmptyState
-          title="Стенд пуст"
+          title="Приборов на стенде нет"
           hint="Топология ещё не перенесена в базу. Это делает мигратор при запуске стека."
           actionLabel="Проверить снова"
           onAction={refetch}
         />
       ) : null}
 
-      {!isPending && !isError && rows.length > 0 ? (
+      {!isPending && summary.devices > 0 ? (
         <>
           <SummaryBar summary={summary} />
           <TopologyTree rows={rows} />

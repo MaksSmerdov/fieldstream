@@ -75,6 +75,8 @@ export const DevicePage = (): React.JSX.Element => {
 
       <Tabs
         value={panel}
+        variant="scrollable"
+        allowScrollButtonsMobile
         onChange={(_event, value: Panel) => {
           setPanel(value);
         }}
@@ -86,7 +88,9 @@ export const DevicePage = (): React.JSX.Element => {
       </Tabs>
 
       {panel === 'values' ? <DeviceValues profile={profile} snapshot={snapshot} /> : null}
-      {panel === 'rules' ? <RulesPanel code={code} labels={labels} /> : null}
+      {/* Ключ по прибору: черновики правок живут внутри панели, и без пересоздания они
+          переехали бы на соседний прибор вместе с открытой вкладкой */}
+      {panel === 'rules' ? <RulesPanel key={code} code={code} labels={labels} /> : null}
       {panel === 'plan' ? <ReadPlanCard code={code} labels={labels} /> : null}
     </>
   );

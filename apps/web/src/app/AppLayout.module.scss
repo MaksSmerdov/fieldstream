@@ -28,6 +28,13 @@
     min-width: 0;
   }
 
+  &__session {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+  }
+
   &__theme {
     flex: 0 0 auto;
     font-size: 18px;

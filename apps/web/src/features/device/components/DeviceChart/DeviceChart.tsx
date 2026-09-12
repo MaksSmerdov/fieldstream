@@ -10,6 +10,7 @@ import { TimeChart } from '../../../../shared/charts/TimeChart/TimeChart.js';
 import type { ChartBand } from '../../../../shared/charts/TimeChart/TimeChart.js';
 import { alignSeries } from '../../../../shared/charts/align-series.js';
 import { EmptyState } from '../../../../shared/ui/EmptyState/EmptyState.js';
+import { ErrorBanner } from '../../../../shared/ui/ErrorBanner/ErrorBanner.js';
 import { ErrorState } from '../../../../shared/ui/ErrorState/ErrorState.js';
 import { SkeletonBlock } from '../../../../shared/ui/SkeletonBlock/SkeletonBlock.js';
 import { MODE_BAND, MODE_LABEL } from '../../mode-view.js';
@@ -99,7 +100,33 @@ export const DeviceChart = ({ code, params }: Props): React.JSX.Element => {
     });
   };
 
-  const ready = !series.isPending && !series.isError;
+  const ready = !series.isPending && (series.hasData || !series.isError);
+
+  /**
+   * Описание графика словами. Канва для вспомогательных программ пустая, и подпись вида
+   * «график прибора» не говорит ничего: человеку нужны сами кривые, их пределы и то,
+   * сколько раз за окно прибор уходил в оттайку.
+   */
+  const chartLabel = useMemo(() => {
+    const lines = shown.map((item) => {
+      const values = item.metric.points
+        .map((point) => point.avg)
+        .filter((value): value is number => value !== null);
+      if (values.length === 0) return `${item.param.label}: данных нет`;
+      const unit = item.param.unit === null ? '' : ` ${item.param.unit}`;
+      const last = values[values.length - 1] ?? 0;
+
+      return (
+        `${item.param.label}: от ${Math.min(...values).toFixed(item.param.precision)}` +
+        ` до ${Math.max(...values).toFixed(item.param.precision)}${unit},` +
+        ` последнее ${last.toFixed(item.param.precision)}${unit}`
+      );
+    });
+    const defrosts = series.spans.filter((span) => span.mode === 'defrost').length;
+    const modes = defrosts === 0 ? '' : `. Оттаек за окно: ${String(defrosts)}`;
+
+    return `График прибора ${code} за ${WINDOW_LABEL[windowKey]}. ${lines.join('. ')}${modes}`;
+  }, [shown, series.spans, code, windowKey]);
 
   return (
     <Paper variant="outlined" className={styles['chart']}>
@@ -138,7 +165,13 @@ export const DeviceChart = ({ code, params }: Props): React.JSX.Element => {
 
       {series.isPending ? <SkeletonBlock rows={1} height={280} label="Строим график" /> : null}
 
-      {series.isError ? <ErrorState error={series.error} onRetry={series.refetch} /> : null}
+      {series.isError && !series.hasData ? (
+        <ErrorState error={series.error} onRetry={series.refetch} />
+      ) : null}
+
+      {series.isError && series.hasData ? (
+        <ErrorBanner error={series.error} onRetry={series.refetch} />
+      ) : null}
 
       {ready && selected.length === 0 ? (
         <EmptyState
@@ -163,7 +196,7 @@ export const DeviceChart = ({ code, params }: Props): React.JSX.Element => {
             ys={data.ys}
             bands={bands}
             theme={theme.palette.mode}
-            label={`График прибора ${code} за ${WINDOW_LABEL[windowKey]}`}
+            label={chartLabel}
             lines={shown.map((item, index) => ({
               label: item.param.label,
               unit: item.param.unit,

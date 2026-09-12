@@ -13,6 +13,7 @@ import { useDeviceCodes } from '../features/alarms/hooks/useDeviceCodes.js';
 import { useSessionStore } from '../shared/auth/session-store.js';
 import { counted } from '../shared/text/plural.js';
 import { EmptyState } from '../shared/ui/EmptyState/EmptyState.js';
+import { ErrorBanner } from '../shared/ui/ErrorBanner/ErrorBanner.js';
 import { ErrorState } from '../shared/ui/ErrorState/ErrorState.js';
 import { SkeletonBlock } from '../shared/ui/SkeletonBlock/SkeletonBlock.js';
 import styles from './AlarmsPage.module.scss';
@@ -48,16 +49,22 @@ export const AlarmsPage = (): React.JSX.Element => {
   });
   const { ack, pendingId, error: ackError } = useAckAlarm();
 
-  /** Новый эпизод приезжает живым каналом: экран с лентой обязан сказать о нём вслух. */
-  const topId = useRef<string | null>(null);
+  /**
+   * Новый эпизод приезжает живым каналом: экран с лентой обязан сказать о нём вслух.
+   * Смена фильтра приносит другой набор строк, и без привязки к фильтру первая строка
+   * нового набора объявлялась бы как только что случившийся аларм.
+   */
+  const filterKey = `${filters.state}|${filters.severity}|${filters.device}`;
+  const top = useRef<{ key: string; id: string } | null>(null);
   useEffect(() => {
     const first = feed.items[0];
     if (first === undefined) return;
-    if (topId.current !== null && topId.current !== first.id && first.active) {
-      setAnnouncement(`новый аларм: ${first.deviceCode}, ${first.metricKey}`);
-    }
-    topId.current = first.id;
-  }, [feed.items]);
+
+    const previous = top.current;
+    top.current = { key: filterKey, id: first.id };
+    if (previous === null || previous.key !== filterKey || previous.id === first.id) return;
+    if (first.active) setAnnouncement(`новый аларм: ${first.deviceCode}, ${first.metricKey}`);
+  }, [feed.items, filterKey]);
 
   const change = (next: Partial<FeedFilters>): void => {
     const merged = { ...filters, ...next };
@@ -84,9 +91,15 @@ export const AlarmsPage = (): React.JSX.Element => {
 
       {feed.isPending ? <SkeletonBlock rows={8} height={44} label="Загружаем ленту" /> : null}
 
-      {feed.isError ? <ErrorState error={feed.error} onRetry={feed.refetch} /> : null}
+      {feed.isError && !feed.hasData ? (
+        <ErrorState error={feed.error} onRetry={feed.refetch} />
+      ) : null}
 
-      {!feed.isPending && !feed.isError && feed.items.length === 0 ? (
+      {feed.isError && feed.hasData ? (
+        <ErrorBanner error={feed.error} onRetry={feed.refetch} />
+      ) : null}
+
+      {!feed.isPending && feed.hasData && feed.items.length === 0 ? (
         <EmptyState
           title="Под фильтры ничего не попало"
           hint="Смените состояние или важность: за выбранным прибором эпизодов может не быть вовсе."
@@ -97,7 +110,7 @@ export const AlarmsPage = (): React.JSX.Element => {
         />
       ) : null}
 
-      {!feed.isPending && !feed.isError && feed.items.length > 0 ? (
+      {!feed.isPending && feed.items.length > 0 ? (
         <>
           <AlarmList items={feed.items} canAck={canAck} pendingId={pendingId} onAck={ack} />
 

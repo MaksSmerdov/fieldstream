@@ -5,6 +5,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { Link as RouterLink } from 'react-router-dom';
 import type { AlarmListItem, Severity } from '@fieldstream/contracts';
 import { MODE_LABEL } from '../../../device/mode-view.js';
+import { momentText, spanText } from '../../../../shared/time/human-time.js';
 import { ageMs } from '../../../../shared/time/serverClock.js';
 import styles from './AlarmList.module.scss';
 
@@ -27,9 +28,6 @@ const SEVERITY_COLOR: Readonly<Record<Severity, 'info' | 'warning' | 'error'>> =
   critical: 'error',
 };
 
-const moment = (iso: string): string =>
-  new Date(Date.parse(iso)).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'medium' });
-
 /** Сколько эпизод длится: у незакрытого счёт идёт от подъёма до сейчас. */
 const duration = (item: AlarmListItem): string => {
   const startedMs = Date.parse(item.occurredAt);
@@ -37,12 +35,8 @@ const duration = (item: AlarmListItem): string => {
     item.clearedAt === null
       ? (ageMs(item.occurredAt) ?? 0) + startedMs
       : Date.parse(item.clearedAt);
-  const lengthMs = Math.max(0, endedMs - startedMs);
 
-  if (lengthMs < 60_000) return `${String(Math.round(lengthMs / 1000))} с`;
-  if (lengthMs < 3_600_000) return `${String(Math.round(lengthMs / 60_000))} мин`;
-
-  return `${String(Math.round(lengthMs / 3_600_000))} ч`;
+  return spanText(endedMs - startedMs);
 };
 
 const boundaryText = (item: AlarmListItem): string => {
@@ -71,7 +65,7 @@ export const AlarmList = ({ items, canAck, pendingId, onAck }: Props): React.JSX
 
     {items.map((item) => (
       <div key={item.id} className={styles['feed__row']} data-alarm={item.id}>
-        <span className={styles['feed__moment']}>{moment(item.occurredAt)}</span>
+        <span className={styles['feed__moment']}>{momentText(item.occurredAt)}</span>
 
         <RouterLink to={`/device/${item.deviceCode}`} className={styles['feed__device']}>
           {item.deviceCode}
@@ -112,7 +106,11 @@ export const AlarmList = ({ items, canAck, pendingId, onAck }: Props): React.JSX
               <span className={styles['feed__quiet']}>не подтверждён</span>
             )
           ) : (
-            <Tooltip title={item.ackedAt === null ? '' : moment(item.ackedAt)} arrow>
+            <Tooltip
+              title={`подтвердил ${item.ackedBy}, ${momentText(item.ackedAt)}`}
+              arrow
+              describeChild
+            >
               <span className={styles['feed__acked']}>{item.ackedBy}</span>
             </Tooltip>
           )}

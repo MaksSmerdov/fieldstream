@@ -3,29 +3,28 @@ import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Link as RouterLink } from 'react-router-dom';
+import type { Severity } from '@fieldstream/contracts';
 import type { TopologyRow } from '../../hooks/useTopologyRows.js';
 import { StatusChip } from '../../../../shared/ui/StatusChip/StatusChip.js';
 import { ValueCell } from '../../../../shared/ui/ValueCell/ValueCell.js';
-import { ageMs } from '../../../../shared/time/serverClock.js';
+import { agoText } from '../../../../shared/time/human-time.js';
 import styles from './TopologyTree.module.scss';
 
 interface Props {
   readonly rows: readonly TopologyRow[];
 }
 
+const SEVERITY_WORD: Readonly<Record<Severity, string>> = {
+  info: 'сообщений',
+  warning: 'предупреждений',
+  critical: 'критических',
+};
+
 /** Высоты рядов заданы: окно прокрутки должно знать размер до отрисовки, иначе список прыгает. */
 const ROW_HEIGHT: Readonly<Record<TopologyRow['kind'], number>> = {
   site: 44,
   line: 40,
   device: 52,
-};
-
-const minutes = (iso: string | null): string => {
-  const age = ageMs(iso);
-  if (age === null) return 'данных не было';
-  if (age < 60_000) return `${String(Math.round(age / 1000))} с назад`;
-
-  return `${String(Math.round(age / 60_000))} мин назад`;
 };
 
 /**
@@ -43,7 +42,13 @@ export const TopologyTree = ({ rows }: Props): React.JSX.Element => {
   });
 
   return (
-    <div className={styles['tree']} ref={scrollRef}>
+    <div
+      className={styles['tree']}
+      ref={scrollRef}
+      role="region"
+      aria-label="Дерево объектов площадки"
+      tabIndex={0}
+    >
       <div
         className={styles['tree__canvas']}
         style={{ height: `${String(virtualizer.getTotalSize())}px` }}
@@ -102,15 +107,16 @@ export const TopologyTree = ({ rows }: Props): React.JSX.Element => {
                     {row.device.stale ? (
                       <ValueCell value={null} stale />
                     ) : (
-                      minutes(row.device.staleSince)
+                      agoText(row.device.staleSince)
                     )}
                   </span>
+                  {/* Важность словом, а не только цветом: красное от жёлтого отличают не все */}
                   {row.device.activeAlarms === 0 ? (
-                    <span className={styles['tree__alarms-empty']}>—</span>
+                    <span className={styles['tree__alarms-empty']}>алармов нет</span>
                   ) : (
                     <Chip
                       size="small"
-                      label={`алармов: ${String(row.device.activeAlarms)}`}
+                      label={`${SEVERITY_WORD[row.device.worstSeverity ?? 'info']}: ${String(row.device.activeAlarms)}`}
                       color={row.device.worstSeverity === 'critical' ? 'error' : 'warning'}
                     />
                   )}

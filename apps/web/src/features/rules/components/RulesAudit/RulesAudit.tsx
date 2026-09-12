@@ -2,6 +2,7 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import type { AlarmRuleAuditEntry } from '@fieldstream/contracts';
 import { MODE_LABEL } from '../../../device/mode-view.js';
+import { momentText } from '../../../../shared/time/human-time.js';
 import styles from './RulesAudit.module.scss';
 
 interface Props {
@@ -33,9 +34,6 @@ const valueText = (value: number | string | boolean | null): string => {
   return WORDS[String(value)] ?? String(value);
 };
 
-const moment = (iso: string): string =>
-  new Date(Date.parse(iso)).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
-
 /**
  * Журнал правок уставок. Показываются прежнее и новое значение каждого поля: запись
  * «уставка изменена» не позволяет понять, что именно произошло, а именно за этим в журнал
@@ -61,7 +59,7 @@ export const RulesAudit = ({ items, labels }: Props): React.JSX.Element => (
                 <span className={styles['audit__mode']}> · {MODE_LABEL[entry.mode]}</span>
               </span>
               <span className={styles['audit__who']}>
-                {entry.changedBy} · {moment(entry.changedAt)}
+                {entry.changedBy} · {momentText(entry.changedAt)}
               </span>
             </div>
 

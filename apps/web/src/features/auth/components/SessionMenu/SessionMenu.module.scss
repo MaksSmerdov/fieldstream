@@ -1,0 +1,17 @@
+.session {
+  &__button {
+    text-transform: none;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__who {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 16px 8px;
+    list-style: none;
+  }
+}

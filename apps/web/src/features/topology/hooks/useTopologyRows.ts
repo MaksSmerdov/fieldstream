@@ -58,6 +58,8 @@ const rowsOf = (tree: TopologyResponse | undefined): TopologyRow[] => {
 export interface TopologyView {
   readonly rows: TopologyRow[];
   readonly summary: TopologySummary;
+  /** Данные хоть раз пришли: неудачный перезапрос не повод прятать то, что уже показано. */
+  readonly hasData: boolean;
   readonly isPending: boolean;
   readonly isError: boolean;
   readonly error: unknown;
@@ -77,6 +79,7 @@ export const useTopologyRows = (): TopologyView => {
   return {
     rows,
     summary,
+    hasData: query.data !== undefined,
     isPending: query.isPending,
     isError: query.isError,
     error: query.error,

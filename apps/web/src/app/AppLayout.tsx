@@ -7,6 +7,7 @@ import Tabs from '@mui/material/Tabs';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom';
+import { SessionMenu } from '../features/auth/components/SessionMenu/SessionMenu.js';
 import { useLivePatch } from '../shared/sse/useLivePatch.js';
 import { LiveBanner } from '../shared/ui/LiveBanner/LiveBanner.js';
 import { useThemeMode } from './theme-mode.js';
@@ -50,13 +51,17 @@ export const AppLayout = (): React.JSX.Element => {
             {section === '/device' ? <Tab label="Прибор" value="/device" /> : null}
           </Tabs>
 
-          <IconButton
-            onClick={toggle}
-            aria-label={mode === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-            className={styles['layout__theme']}
-          >
-            {mode === 'dark' ? '☀' : '☾'}
-          </IconButton>
+          <div className={styles['layout__session']}>
+            <IconButton
+              onClick={toggle}
+              aria-label={mode === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+              className={styles['layout__theme']}
+            >
+              {mode === 'dark' ? '☀' : '☾'}
+            </IconButton>
+
+            <SessionMenu />
+          </div>
         </Toolbar>
       </AppBar>
 

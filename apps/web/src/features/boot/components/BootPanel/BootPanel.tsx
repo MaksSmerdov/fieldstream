@@ -19,6 +19,14 @@ const MARK: Readonly<Record<BootStageView['status'], string>> = {
   failed: '×',
 };
 
+/** Состояние стадии словами: галочка и цвет остаются, но смысл держится не на них. */
+const STATUS_WORD: Readonly<Record<BootStageView['status'], string>> = {
+  done: 'готово',
+  running: 'идёт',
+  pending: 'ждёт',
+  failed: 'не удалось',
+};
+
 export const BootPanel = (): React.JSX.Element | null => {
   const { data, isPending, isError } = useQuery({
     queryKey: queryKeys.boot,
@@ -62,6 +70,7 @@ export const BootPanel = (): React.JSX.Element | null => {
               {MARK[stage.status]}
             </span>
             <span className={styles['boot__title']}>{stage.title}</span>
+            <span className={styles['boot__status']}>{STATUS_WORD[stage.status]}</span>
             <span className={styles['boot__detail']}>{stage.detail ?? ''}</span>
           </Box>
         ))}

@@ -3,23 +3,13 @@ import Typography from '@mui/material/Typography';
 import { Link as RouterLink } from 'react-router-dom';
 import type { DeviceSnapshot } from '@fieldstream/contracts';
 import { StatusChip } from '../../../../shared/ui/StatusChip/StatusChip.js';
-import { ageMs } from '../../../../shared/time/serverClock.js';
+import { agoText } from '../../../../shared/time/human-time.js';
 import { MODE_LABEL } from '../../mode-view.js';
 import styles from './DeviceHeader.module.scss';
 
 interface Props {
   readonly snapshot: DeviceSnapshot;
 }
-
-/** Возраст последнего значения словами: «устарели» без числа не даёт понять, насколько. */
-const freshness = (iso: string | null): string => {
-  const age = ageMs(iso);
-  if (age === null) return 'данных не было';
-  if (age < 60_000) return `${String(Math.round(age / 1000))} с назад`;
-  if (age < 3_600_000) return `${String(Math.round(age / 60_000))} мин назад`;
-
-  return `${String(Math.round(age / 3_600_000))} ч назад`;
-};
 
 export const DeviceHeader = ({ snapshot }: Props): React.JSX.Element => (
   <header className={styles['header']}>
@@ -42,7 +32,7 @@ export const DeviceHeader = ({ snapshot }: Props): React.JSX.Element => (
         size="small"
         variant="outlined"
         color={snapshot.stale ? 'warning' : 'default'}
-        label={`данные ${freshness(snapshot.ts)}`}
+        label={`данные ${agoText(snapshot.ts)}`}
       />
       {snapshot.consecutiveErrors === 0 ? null : (
         <Chip
