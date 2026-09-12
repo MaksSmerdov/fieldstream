@@ -22,6 +22,7 @@ const envSchema = z.object({
   PROCESSOR_HOST: z.string().min(1).default('0.0.0.0'),
   PROCESSOR_HTTP_PORT: port.default(8092),
   HEALTH_INTERVAL_MS: z.coerce.number().int().min(1_000).max(60_000).default(5_000),
+  ALARM_RULES_REFRESH_MS: z.coerce.number().int().min(1_000).max(300_000).default(10_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

@@ -3,6 +3,7 @@ import type { DynamicModule } from '@nestjs/common';
 import type pg from 'pg';
 import type { Clock } from '@fieldstream/domain';
 import type { Logger } from '@fieldstream/nest-common';
+import { AlarmRulesService } from './alarms/alarm-rules.service.js';
 import type { Env } from './config/env.js';
 import { HealthService } from './health/health.service.js';
 import { HealthController } from './http/health.controller.js';
@@ -37,6 +38,7 @@ export class AppModule {
         { provide: POOL, useValue: deps.pool },
         ProducerService,
         DeviceRefsService,
+        AlarmRulesService,
         HealthService,
         RawConsumerService,
         CyclesConsumerService,

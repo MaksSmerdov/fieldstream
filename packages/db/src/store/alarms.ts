@@ -2,6 +2,27 @@ import type pg from 'pg';
 import type { AlarmRule, DeviceMode, Severity } from '@fieldstream/contracts';
 import type { ProfileAlarmRule } from '@fieldstream/device-profiles';
 
+/** Подъём аларма: строка эпизода, которую позже закроет снятие. */
+export interface AlarmEventRow {
+  readonly alarmId: string;
+  readonly deviceId: number;
+  readonly metricKey: string;
+  readonly mode: DeviceMode;
+  readonly severity: Severity;
+  readonly boundary: 'min' | 'max';
+  readonly value: number | null;
+  readonly threshold: number | null;
+  readonly occurredAt: string;
+  readonly dedupeKey: string;
+}
+
+/** Снятие аларма: закрывает строку своего подъёма по ключу эпизода. */
+export interface AlarmClearRow {
+  readonly dedupeKey: string;
+  readonly clearedAt: string;
+  readonly clearedValue: number | null;
+}
+
 interface AlarmRuleRow {
   readonly device_code: string;
   readonly metric_key: string;
@@ -72,4 +93,58 @@ export const loadAlarmRules = async (client: pg.ClientBase): Promise<AlarmRule[]
     severity: row.severity,
     enabled: row.enabled,
   }));
+};
+
+/**
+ * Подъёмы алармов одной пачкой. Повторная доставка ничего не добавляет: ключ эпизода
+ * уникален, а идентификатор вычислен из него же, поэтому строка совпадает с прежней.
+ */
+export const insertAlarmEvents = async (
+  client: pg.ClientBase,
+  rows: readonly AlarmEventRow[],
+): Promise<number> => {
+  if (rows.length === 0) return 0;
+
+  const result = await client.query(
+    `INSERT INTO core.alarm_events (id, device_id, metric_key, mode, severity, boundary,
+       value, threshold, occurred_at, dedupe_key)
+     SELECT * FROM unnest($1::uuid[], $2::int[], $3::text[], $4::text[], $5::text[], $6::text[],
+       $7::float8[], $8::float8[], $9::timestamptz[], $10::text[])
+     ON CONFLICT (dedupe_key) DO NOTHING`,
+    [
+      rows.map((row) => row.alarmId),
+      rows.map((row) => row.deviceId),
+      rows.map((row) => row.metricKey),
+      rows.map((row) => row.mode),
+      rows.map((row) => row.severity),
+      rows.map((row) => row.boundary),
+      rows.map((row) => row.value),
+      rows.map((row) => row.threshold),
+      rows.map((row) => row.occurredAt),
+      rows.map((row) => row.dedupeKey),
+    ],
+  );
+  return result.rowCount ?? 0;
+};
+
+/** Снятия алармов одной пачкой. Уже закрытый эпизод второй раз не трогается. */
+export const clearAlarmEvents = async (
+  client: pg.ClientBase,
+  rows: readonly AlarmClearRow[],
+): Promise<number> => {
+  if (rows.length === 0) return 0;
+
+  const result = await client.query(
+    `UPDATE core.alarm_events e
+     SET cleared_at = c.cleared_at, cleared_value = c.cleared_value
+     FROM unnest($1::text[], $2::timestamptz[], $3::float8[])
+       AS c(dedupe_key, cleared_at, cleared_value)
+     WHERE e.dedupe_key = c.dedupe_key AND e.cleared_at IS NULL`,
+    [
+      rows.map((row) => row.dedupeKey),
+      rows.map((row) => row.clearedAt),
+      rows.map((row) => row.clearedValue),
+    ],
+  );
+  return result.rowCount ?? 0;
 };

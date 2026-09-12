@@ -40,9 +40,14 @@ log.info(
 log.info(
   {
     consumes: [TOPICS.telemetryRaw.name, TOPICS.pollCycles.name],
-    produces: [TOPICS.telemetryReadings.name, TOPICS.deviceState.name, TOPICS.telemetryRawDlq.name],
+    produces: [
+      TOPICS.telemetryReadings.name,
+      TOPICS.deviceState.name,
+      TOPICS.alarmEvents.name,
+      TOPICS.telemetryRawDlq.name,
+    ],
   },
-  'читает сырые кадры и циклы, пишет показания, состояние и очередь недоставленных',
+  'читает сырые кадры и циклы, пишет показания, алармы, состояние и очередь недоставленных',
 );
 log.info({ port: env.PROCESSOR_HTTP_PORT }, 'GET /health/live, /health/ready, /metrics');
 

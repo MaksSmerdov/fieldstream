@@ -5,6 +5,8 @@ import type pg from 'pg';
 import { TOPICS } from '@fieldstream/contracts';
 import type { TelemetryReading } from '@fieldstream/contracts';
 import {
+  clearAlarmEvents,
+  insertAlarmEvents,
   insertDeviceEvents,
   insertReadings,
   recordDlqMessages,
@@ -12,7 +14,7 @@ import {
 } from '@fieldstream/db';
 import type { DeviceEventRow, DlqRow, ReadingRow } from '@fieldstream/db';
 import { toIsoTimestamp } from '@fieldstream/domain';
-import type { Clock, SpikeFilterState } from '@fieldstream/domain';
+import type { Clock, DeviceAlarmState, SpikeFilterState } from '@fieldstream/domain';
 import {
   commitThrough,
   createConsumer,
@@ -22,11 +24,20 @@ import {
 } from '@fieldstream/kafka';
 import type { RawOutgoingMessage } from '@fieldstream/kafka';
 import type { Logger } from '@fieldstream/nest-common';
+import { AlarmRulesService } from '../alarms/alarm-rules.service.js';
 import { HealthService } from '../health/health.service.js';
 import type { ProcessorMetrics } from '../metrics/metrics.js';
 import { PRODUCER_NAME, ProducerService } from '../publish/producer.service.js';
 import { DeviceRefsService } from '../topology/device-refs.service.js';
 import { CLOCK, LOGGER, METRICS, POOL } from '../tokens.js';
+import {
+  alarmEventOf,
+  clearedRowOf,
+  evaluateFrameAlarms,
+  raisedRowOf,
+  toOutcome,
+} from './alarms.js';
+import type { AlarmOutcome } from './alarms.js';
 import { processFrame } from './frame.js';
 
 export const RAW_GROUP = 'fs-processor';
@@ -66,6 +77,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
   private readonly consumer: Consumer;
   private readonly attempts = new Map<number, number>();
   private filters = new Map<string, SpikeFilterState>();
+  private alarms = new Map<string, DeviceAlarmState>();
   private running = false;
 
   public constructor(
@@ -75,6 +87,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
     @Inject(METRICS) private readonly metrics: ProcessorMetrics,
     private readonly producer: ProducerService,
     private readonly refs: DeviceRefsService,
+    private readonly rules: AlarmRulesService,
     private readonly health: HealthService,
   ) {
     this.consumer = createConsumer(producer.kafka, RAW_GROUP);
@@ -113,6 +126,8 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
 
     const startedAt = this.clock.now();
     const filters = new Map(this.filters);
+    const alarms = new Map(this.alarms);
+    const alarmOutcomes: AlarmOutcome[] = [];
     const rows: ReadingRow[] = [];
     const readings: TelemetryReading[] = [];
     const events: DeviceEventRow[] = [];
@@ -146,6 +161,18 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
       if (deviceId !== undefined) {
         for (const event of this.health.observeFrame(outcome.observation)) {
           events.push({ deviceId, event });
+        }
+
+        const deviceCode = outcome.observation.deviceCode;
+        const evaluated = evaluateFrameAlarms({
+          observation: outcome.observation,
+          rows: outcome.rows,
+          rules: this.rules.forDevice(deviceCode),
+          prevState: alarms.get(deviceCode) ?? {},
+        });
+        alarms.set(deviceCode, evaluated.state);
+        for (const transition of evaluated.transitions) {
+          alarmOutcomes.push(toOutcome(transition, deviceId, outcome.reading.traceId));
         }
       }
     }
@@ -186,22 +213,32 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
       error: item.error,
     }));
 
+    const raised = alarmOutcomes.filter((item) => item.transition.state === 'raised');
+    const cleared = alarmOutcomes.filter((item) => item.transition.state === 'cleared');
+
     try {
       const inserted = await withTransaction(this.pool, async (client) => {
         const count = await insertReadings(client, rows);
         await insertDeviceEvents(client, events);
+        await insertAlarmEvents(client, raised.map(raisedRowOf));
+        await clearAlarmEvents(client, cleared.map(clearedRowOf));
         await recordDlqMessages(client, dlqRows);
         return count;
       });
       await this.producer.sendRaw(dlqMessages);
-      await this.producer.send(
-        readings.map((reading) =>
+      await this.producer.send([
+        ...readings.map((reading) =>
           this.producer.encode(TOPICS.telemetryReadings, reading, reading.traceId),
         ),
-      );
+        ...alarmOutcomes.map((item) =>
+          this.producer.encode(TOPICS.alarmEvents, alarmEventOf(item), item.traceId),
+        ),
+      ]);
 
       this.metrics.observeRows('readings', inserted);
       this.metrics.observeFrames('accepted', readings.length);
+      if (raised.length > 0) this.metrics.observeAlarms('raised', raised.length);
+      if (cleared.length > 0) this.metrics.observeAlarms('cleared', cleared.length);
       for (const item of poisoned) {
         this.metrics.observeDlq(item.errorClass);
         this.log.warn(
@@ -232,6 +269,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
 
     this.attempts.delete(batch.partition);
     this.filters = filters;
+    this.alarms = alarms;
     await commitThrough(payload, lastOffset);
     await payload.heartbeat();
     this.metrics.observeBatch(batch.topic, this.clock.now() - startedAt);

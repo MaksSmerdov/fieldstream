@@ -38,6 +38,8 @@ export interface AlarmTransition {
   threshold: number | null;
   boundary: AlarmBoundary;
   occurredAt: number;
+  /** Время подъёма: у снятия оно берётся из состояния, поэтому эпизод остаётся одной строкой. */
+  raisedAt: number;
 }
 
 export interface EvaluateDeviceAlarmsInput {
@@ -100,6 +102,7 @@ const clearedTransition = (
   threshold: prev.threshold,
   boundary: prev.boundary,
   occurredAt: input.nowMs,
+  raisedAt: prev.raisedAt,
 });
 
 /** Правила текущего режима по метрикам: ключ уставки это (прибор, метрика, режим). */
@@ -192,6 +195,7 @@ export const evaluateDeviceAlarms = (input: EvaluateDeviceAlarmsInput): DeviceAl
       threshold: violation.threshold,
       boundary: violation.boundary,
       occurredAt: input.nowMs,
+      raisedAt: input.nowMs,
     });
     state[metricKey] = {
       raised: true,
