@@ -39,7 +39,7 @@ export const BootPanel = (): React.JSX.Element | null => {
     return (
       <Paper className={styles['boot']} elevation={0}>
         <Typography variant="subtitle2">Проверяем стенд</Typography>
-        <LinearProgress />
+        <LinearProgress aria-label="Проверяем стенд" />
       </Paper>
     );
   }
@@ -76,7 +76,9 @@ export const BootPanel = (): React.JSX.Element | null => {
         ))}
       </Box>
 
-      {data.ready ? null : <LinearProgress className={styles['boot__progress']} />}
+      {data.ready ? null : (
+        <LinearProgress className={styles['boot__progress']} aria-label="Стенд готовится" />
+      )}
     </Paper>
   );
 };

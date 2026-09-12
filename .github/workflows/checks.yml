@@ -1,0 +1,54 @@
+name: Проверки
+
+on:
+  push:
+    branches: [main, 'stage-*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Сборка, типы, линтер и тесты
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Сборка пакетов
+        run: pnpm build
+
+      - name: Типы
+        run: pnpm typecheck
+
+      - name: Линтер
+        run: pnpm lint
+
+      - name: Формат
+        run: pnpm format:check
+
+      - name: Границы зависимостей
+        run: pnpm arch
+
+      - name: Модульные тесты
+        run: pnpm test
+
+      # Конфиг создания топиков порождается из манифеста: расхождение означает, что манифест
+      # правили, а конфиг забыли пересобрать
+      - name: Конфиг топиков совпадает с манифестом
+        run: |
+          pnpm topics:gen
+          git diff --exit-code infra/kafka/topics.conf

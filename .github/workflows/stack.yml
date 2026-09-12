@@ -1,0 +1,117 @@
+name: Стенд
+
+# Тяжёлые проверки: они поднимают настоящие Kafka, TimescaleDB и весь стенд в Docker,
+# поэтому идут по расписанию и по кнопке, а не на каждый пуш
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: stack-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Пароли одноразовые: стенд поднимается с нуля и сносится вместе с томами
+  FIELDSTREAM_ENV: |
+    POSTGRES_USER=fieldstream
+    POSTGRES_PASSWORD=ci-postgres-pw
+    FS_MIGRATOR_PASSWORD=ci-migrator-pw
+    FS_INGEST_PASSWORD=ci-ingest-pw
+    FS_API_PASSWORD=ci-api-pw
+    SIM_SEED=fieldstream
+    SIM_SPEED=1
+    SIM_TURNAROUND_MS=5
+    SIM_BUS_TIMEOUT_MS=500
+    SIM_STALL_MS=5000
+    KAFKA_BROKERS=localhost:29092
+    MODBUS_HOST_OVERRIDE=127.0.0.1
+    COLLECTOR_HTTP_PORT=8091
+    LOG_LEVEL=info
+    GATEWAY_HTTP_PORT=8093
+    CORS_ORIGINS=http://localhost:5173
+    AUTH_SECRET=ci-secret-not-shorter-than-thirty-two-chars
+    DEMO_PASSWORD=fieldstream
+    SEED_DAYS=2
+    SEED_COMPRESS=off
+
+jobs:
+  integration:
+    name: Интеграционные тесты на настоящих Kafka и базе
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Интеграционные тесты
+        run: pnpm test:integration
+
+  stack:
+    name: Сценарии интерфейса против поднятого стенда
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Окружение стенда
+        run: printf '%s\n' "$FIELDSTREAM_ENV" > .env
+
+      - name: Поднять стенд
+        run: docker compose -f infra/compose/docker-compose.yml up -d --build
+
+      # Панель готовности отвечает раньше, чем стенд действительно готов: ждём не порт,
+      # а признак готовности, который стенд выставляет сам после засева истории
+      - name: Дождаться готовности
+        run: |
+          for attempt in $(seq 1 120); do
+            if curl -sf http://localhost:8080/api/boot | grep -q '"ready":true'; then
+              echo "стенд готов за $((attempt * 5)) с"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "стенд не поднялся"
+          exit 1
+
+      - name: Браузер для сценариев
+        run: pnpm --filter @fieldstream/web exec playwright install --with-deps chromium
+
+      - name: Сценарии Playwright
+        env:
+          E2E_BASE_URL: http://localhost:8080
+          E2E_CHANNEL: ''
+        run: pnpm --filter @fieldstream/web exec playwright test
+
+      - name: Журналы стенда при падении
+        if: failure()
+        run: docker compose -f infra/compose/docker-compose.yml logs --tail 200
+
+      - name: Следы упавших сценариев
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: apps/web/test-results
+          retention-days: 7
+
+      - name: Снести стенд
+        if: always()
+        run: docker compose -f infra/compose/docker-compose.yml down -v
