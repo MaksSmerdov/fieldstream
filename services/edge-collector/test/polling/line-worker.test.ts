@@ -183,4 +183,37 @@ describe('воркер линии', () => {
     expect(cycles.length).toBeGreaterThanOrEqual(6);
     expect(worker.snapshot().connected).toBe(false);
   });
+
+  /**
+   * Команда остановки и следующая за ней команда запуска приходят из брокера подряд.
+   * Остановка не должна закрыть порт уже нового цикла: линия иначе замолчит навсегда,
+   * причём исполнитель ответит «применено».
+   */
+  it('запуск сразу после остановки не оставляет линию мёртвой', async () => {
+    const fake = fakeLink();
+    const { worker, cycles } = makeWorker(fake.link);
+
+    worker.start();
+    const stopped = worker.stop();
+    worker.start();
+    await stopped;
+
+    expect(worker.isRunning()).toBe(true);
+    expect(worker.snapshot().connected).toBe(true);
+    expect(cycles.length).toBeGreaterThan(0);
+
+    await worker.stop();
+    expect(worker.isRunning()).toBe(false);
+    expect(worker.snapshot().connected).toBe(false);
+  });
+
+  it('повторная остановка не закрывает порт второй раз', async () => {
+    const fake = fakeLink();
+    const { worker } = makeWorker(fake.link);
+
+    worker.start();
+    await Promise.all([worker.stop(), worker.stop()]);
+
+    expect(fake.counters.destroys).toBe(1);
+  });
 });

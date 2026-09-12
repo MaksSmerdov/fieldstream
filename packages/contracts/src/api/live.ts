@@ -100,8 +100,11 @@ export const liveFrameSchema = z.discriminatedUnion('kind', [
 ]);
 export type LiveFrame = z.infer<typeof liveFrameSchema>;
 
-/** Ключ подписки: площадка, прибор или роль. Тот же ключ живёт в событии и в запросе подписки. */
+/**
+ * Ключ подписки: площадка, линия, прибор или роль. Тот же ключ живёт в событии и в запросе
+ * подписки, поэтому набор видов здесь обязан совпадать с тем, что кладёт в событие шлюз.
+ */
 export const liveSubscriptionKeySchema = z
   .string()
-  .regex(/^(site|device|role|topic):[A-Za-z0-9._-]+$/, 'ожидается вид device:RC-101');
+  .regex(/^(site|line|device|role|topic):[A-Za-z0-9._-]+$/, 'ожидается вид device:RC-101');
 export type LiveSubscriptionKey = z.infer<typeof liveSubscriptionKeySchema>;

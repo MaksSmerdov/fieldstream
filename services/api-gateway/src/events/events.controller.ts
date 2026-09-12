@@ -26,16 +26,24 @@ const keysOf = (raw: string | undefined): Set<LiveSubscriptionKey> | null => {
 export class EventsController {
   public constructor(private readonly bus: LiveBusService) {}
 
+  /**
+   * Позиция возобновления берётся из заголовка, а при его отсутствии из строки запроса:
+   * браузер ставит заголовок сам только при своём автореконнекте, а при переоткрытии
+   * по сторожу тишины поставить его нечем.
+   */
   @Sse()
   public stream(
     @Req() request: AuthenticatedRequest,
     @Query('keys') keys: string | undefined,
+    @Query('last_event_id') lastEventId: string | undefined,
     @CurrentUser() claims: AccessClaims,
   ): Observable<MessageEvent> {
     const header = request.headers['last-event-id'];
+    const fromHeader = typeof header === 'string' && header.length > 0 ? header : null;
+    const fromQuery = lastEventId !== undefined && lastEventId.length > 0 ? lastEventId : null;
 
     return this.bus.stream({
-      lastEventId: typeof header === 'string' && header.length > 0 ? header : null,
+      lastEventId: fromHeader ?? fromQuery,
       permissions: claims.permissions,
       keys: keysOf(keys),
     });

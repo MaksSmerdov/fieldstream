@@ -33,7 +33,14 @@ interface TopologyRow {
   readonly last_ok_at: Date | null;
   readonly active_alarms: string;
   readonly worst: number | null;
+  readonly last_ts: Date | null;
+  readonly stale: boolean;
 }
+
+/** Последнее значение прибора за последний час: по нему сервер решает, устарели ли данные. */
+const LAST_READING = `
+  SELECT device_id, max(ts) AS last_ts FROM ts.readings
+  WHERE ts > now() - INTERVAL '1 hour' GROUP BY device_id`;
 
 /** Незакрытые алармы прибора: счётчик и худшая важность одним подзапросом. */
 const ACTIVE_ALARMS = `
@@ -63,13 +70,18 @@ export const loadTopologyTree = async (client: pg.ClientBase): Promise<TopologyS
             d.code AS device_code, d.label, d.profile_key, d.profile_version, d.slave_id,
             d.enabled AS device_enabled,
             st.status, st.reason, st.mode, st.since, st.last_ok_at,
-            coalesce(a.active, 0) AS active_alarms, a.worst
+            coalesce(a.active, 0) AS active_alarms, a.worst,
+            r.last_ts,
+            (r.last_ts IS NULL
+              OR now() - r.last_ts > make_interval(secs => l.poll_interval_ms * 3 / 1000.0))
+              AS stale
      FROM core.sites s
      JOIN core.gateways g ON g.site_id = s.id
      JOIN core.lines l ON l.gateway_id = g.id
      JOIN core.devices d ON d.line_id = l.id
      LEFT JOIN core.device_state st ON st.device_id = d.id
      LEFT JOIN (${ACTIVE_ALARMS}) a ON a.device_id = d.id
+     LEFT JOIN (${LAST_READING}) r ON r.device_id = d.id
      ORDER BY s.code, g.code, l.code, d.code`,
   );
 
@@ -116,6 +128,8 @@ export const loadTopologyTree = async (client: pg.ClientBase): Promise<TopologyS
       lastOkAt: isoOrNull(row.last_ok_at),
       activeAlarms: Number(row.active_alarms),
       worstSeverity: row.worst === null ? null : (SEVERITY_BY_RANK[row.worst] ?? null),
+      stale: row.stale,
+      staleSince: isoOrNull(row.last_ts),
     });
   }
 

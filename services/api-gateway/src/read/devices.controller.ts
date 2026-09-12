@@ -19,6 +19,7 @@ import {
 import type {
   AlarmRulesResponse,
   AlarmRulesUpdateResponse,
+  DeviceProfileView,
   DeviceSnapshot,
   ReadPlanResponse,
   SeriesResponse,
@@ -151,6 +152,46 @@ export class DevicesController {
     if (result === null) throw new NotFoundException(`прибора ${code} нет в топологии`);
 
     return { deviceCode: code, changes: result.changes, rules: result.rules };
+  }
+
+  /**
+   * Описание модели прибора: секции и параметры в порядке профиля. Нужно экрану, чтобы
+   * группировать значения и рисовать перечисления словами, а не кодами.
+   */
+  @Get(':code/profile')
+  @RequirePermission('devices')
+  public async profile(@Param('code') code: string): Promise<DeviceProfileView> {
+    const snapshot = await withClient(this.pool, (client) => loadDeviceSnapshot(client, code));
+    if (snapshot === null) throw new NotFoundException(`прибора ${code} нет в топологии`);
+
+    const profile = profileByVersion(snapshot.profileKey, snapshot.profileVersion);
+    if (profile === undefined) {
+      throw new NotFoundException(
+        `нет профиля ${snapshot.profileKey} версии ${String(snapshot.profileVersion)}`,
+      );
+    }
+
+    return {
+      deviceCode: code,
+      profileKey: profile.profileKey,
+      profileVersion: profile.version,
+      label: profile.label,
+      sections: profile.sections.map((section) => ({
+        key: section.key,
+        label: section.label,
+        params: section.params.map((param) => ({
+          metricKey: param.key,
+          label: param.label,
+          unit: param.unit ?? null,
+          precision: param.precision,
+          kind: param.bits !== undefined ? 'bits' : param.enum !== undefined ? 'enum' : 'number',
+          states: param.enum ?? null,
+          bits:
+            param.bits?.map((bit) => ({ bit: bit.bit, key: bit.key, label: bit.label })) ?? null,
+          range: param.range === undefined ? null : { min: param.range.min, max: param.range.max },
+        })),
+      })),
+    };
   }
 
   /** Карта регистров: тот же план, что уходит на линию, в склеенном или поштучном виде. */

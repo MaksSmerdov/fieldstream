@@ -61,7 +61,7 @@ describe('pickSource', () => {
       source: 'readings',
       bucketMs: 20_000,
       points: 1080,
-      truncated: false,
+      truncated: true,
     });
   });
 
@@ -79,7 +79,7 @@ describe('pickSource', () => {
       source: 'readings_1m',
       bucketMs: 6 * MINUTE_MS,
       points: 1680,
-      truncated: false,
+      truncated: true,
     });
   });
 
@@ -92,7 +92,7 @@ describe('pickSource', () => {
     });
   });
 
-  it('окно, уложившееся ровно в maxPoints, не считается обрезанным', () => {
+  it('окно с шагом ровно по разрешению источника не считается прорежённым', () => {
     const plan = pickSource(MAX_SERIES_POINTS * 10 * SECOND_MS);
 
     expect(plan.source).toBe('readings');
@@ -101,7 +101,7 @@ describe('pickSource', () => {
     expect(plan.truncated).toBe(false);
   });
 
-  it('произвольный лимит на своей границе тоже не считается обрезанным', () => {
+  it('произвольный лимит на своей границе тоже не прорежает', () => {
     const plan = pickSource(500 * MINUTE_MS, 500);
 
     expect(plan.points).toBe(500);
@@ -123,17 +123,19 @@ describe('pickSource', () => {
     expect(violations((plan, seriesCase) => plan.points > seriesCase.maxPoints)).toEqual([]);
   });
 
-  it('truncated поднимается ровно тогда, когда точек больше лимита', () => {
+  /**
+   * Признак нужен бейджу под графиком: он говорит «окно прорежено», а не «данных нет».
+   * Поднимается ровно тогда, когда шаг крупнее разрешения источника.
+   */
+  it('признак прореживания совпадает с тем, крупнее ли шаг разрешения источника', () => {
     expect(
-      violations((plan, seriesCase) => plan.truncated !== plan.points > seriesCase.maxPoints),
+      violations((plan) => plan.truncated !== plan.bucketMs > RESOLUTION_MS[plan.source]),
     ).toEqual([]);
   });
 
-  it('обрезка отмечается, когда план в лимит не уложился', () => {
-    const plan = pickSource(25 * SECOND_MS, 2.5);
-
-    expect(plan.points).toBe(3);
-    expect(plan.truncated).toBe(true);
+  it('широкое окно прорежается, узкое отдаётся как есть', () => {
+    expect(pickSource(SIX_HOURS_MS, 100).truncated).toBe(true);
+    expect(pickSource(20 * MINUTE_MS, 200).truncated).toBe(false);
   });
 
   it('источник переключается только на своих границах', () => {

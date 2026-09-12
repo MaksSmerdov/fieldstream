@@ -11,6 +11,7 @@ export interface SeriesPlan {
   /** Шаг агрегации в миллисекундах. */
   bucketMs: number;
   points: number;
+  /** Окно прорежено: точек в ответе меньше, чем отсчётов в источнике. */
   truncated: boolean;
 }
 
@@ -37,6 +38,9 @@ export const pickSource = (rangeMs: number, maxPoints = MAX_SERIES_POINTS): Seri
     source === 'readings' ? 10_000 : source === 'readings_1m' ? MINUTE_MS : HOUR_MS;
   const bucketMs = roundBucket(rangeMs / maxPoints, minBucketMs);
   const points = Math.ceil(rangeMs / bucketMs);
+  // Прорежено: в источнике отсчётов больше, чем точек в ответе. Шаг всегда кратен разрешению
+  // источника, поэтому число точек само по себе предела не превышает, и сравнивать надо с ним.
+  const available = Math.ceil(rangeMs / minBucketMs);
 
-  return { source, bucketMs, points, truncated: points > maxPoints };
+  return { source, bucketMs, points, truncated: available > points };
 };

@@ -160,6 +160,8 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
   let lastCycle: LineSnapshot['lastCycle'] = null;
   let running = false;
   let loop: Promise<void> | null = null;
+  let stopping: Promise<void> | null = null;
+  let runId = 0;
   let abort = new AbortController();
 
   const planFor = (context: DeviceContext): ReadPlan => {
@@ -352,8 +354,9 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
   /** Работает ли воркер прямо сейчас: остановка может прийти во время любого ожидания. */
   const isRunning = (): boolean => running;
 
-  const runLoop = async (): Promise<void> => {
-    while (isRunning()) {
+  /** Цикл живёт до остановки или до следующего запуска: свой номер он проверяет сам. */
+  const runLoop = async (myRun: number): Promise<void> => {
+    while (isRunning() && runId === myRun) {
       const report = await guardedCycle();
       lastCycle = {
         at: toIsoTimestamp(clock.now()),
@@ -363,25 +366,45 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
         failed: report.failed,
       };
       options.onCycle?.(report, slots.filter((slot) => slot.breaker.open).length);
-      if (isRunning()) await sleep(report.nextDelayMs, abort.signal);
+      if (isRunning() && runId === myRun) await sleep(report.nextDelayMs, abort.signal);
     }
   };
 
   return {
     lineCode: line.code,
     runCycle,
+    /**
+     * Запуск дожидается незавершённой остановки. Иначе включение сразу после выключения
+     * попадает в гонку: остановка доводит своё дело до конца и закрывает порт уже нового цикла.
+     */
     start: () => {
       if (running) return;
       running = true;
+      runId += 1;
+      const myRun = runId;
       abort = new AbortController();
-      loop = runLoop();
+      const previous = stopping;
+      loop = (async () => {
+        if (previous !== null) await previous;
+        await runLoop(myRun);
+      })();
     },
+    /** Остановка не закрывает порт, если её успели обогнать новым запуском. */
     stop: async () => {
+      if (!isRunning() && stopping !== null) return stopping;
       running = false;
       abort.abort();
-      await loop;
-      loop = null;
-      link.destroy();
+      const current = loop;
+      stopping = (async () => {
+        await current;
+        if (!isRunning()) {
+          loop = null;
+          link.destroy();
+        }
+        stopping = null;
+      })();
+
+      return stopping;
     },
     isRunning,
     setPlanMode: (mode) => {
