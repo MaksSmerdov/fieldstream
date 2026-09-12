@@ -3,6 +3,7 @@ export * from './setup/migrate.js';
 export * from './setup/roles.js';
 export * from './store/alarms.js';
 export * from './store/rate-limit.js';
+export * from './store/read.js';
 export * from './store/sessions.js';
 export * from './store/state.js';
 export * from './store/topology.js';
