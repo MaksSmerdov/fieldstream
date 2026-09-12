@@ -163,7 +163,8 @@ describe('лента алармов', () => {
     const buttons = await screen.findAllByRole('button', { name: 'Подтвердить' });
     await userEvent.click(buttons[0] as HTMLElement);
 
-    expect(await screen.findByText('engineer@fieldstream.local')).toBeInTheDocument();
+    // В колонке видно имя, а полный адрес лежит в подсказке
+    expect(await screen.findByText('engineer')).toBeInTheDocument();
     expect(calls.some((call) => call === `POST /api/alarms/${ID[0]}/ack`)).toBe(true);
   });
 
@@ -176,7 +177,7 @@ describe('лента алармов', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Сервер недоступен');
     await waitFor(() => {
-      expect(screen.queryByText('engineer@fieldstream.local')).not.toBeInTheDocument();
+      expect(screen.queryByText('engineer')).not.toBeInTheDocument();
     });
     expect(screen.getAllByRole('button', { name: 'Подтвердить' })).toHaveLength(2);
   });

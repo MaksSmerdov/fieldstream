@@ -44,9 +44,10 @@ test('подтверждение остаётся после перезагру�
   const id = String(await unacked.getAttribute('data-alarm'));
   const row = page.locator(`[data-alarm="${id}"]`);
 
+  const who = EMAIL.split('@')[0] ?? EMAIL;
   await row.getByRole('button', { name: 'Подтвердить' }).click();
-  await expect(row.getByText(EMAIL)).toBeVisible();
+  await expect(row.getByText(who, { exact: true })).toBeVisible();
 
   await page.reload();
-  await expect(page.locator(`[data-alarm="${id}"]`).getByText(EMAIL)).toBeVisible();
+  await expect(page.locator(`[data-alarm="${id}"]`).getByText(who, { exact: true })).toBeVisible();
 });

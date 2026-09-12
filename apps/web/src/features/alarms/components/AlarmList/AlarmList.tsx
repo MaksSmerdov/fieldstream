@@ -111,7 +111,8 @@ export const AlarmList = ({ items, canAck, pendingId, onAck }: Props): React.JSX
               arrow
               describeChild
             >
-              <span className={styles['feed__acked']}>{item.ackedBy}</span>
+              {/* В колонку влезает имя, а не адрес целиком: полный адрес лежит в подсказке */}
+              <span className={styles['feed__acked']}>{item.ackedBy.split('@')[0]}</span>
             </Tooltip>
           )}
         </span>
