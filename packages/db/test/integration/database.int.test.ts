@@ -19,6 +19,8 @@ import { insertPollCycles, insertReadings } from '../../src/store/writer.js';
 import type { ReadingRow } from '../../src/store/writer.js';
 
 const IMAGE = 'timescale/timescaledb-ha:pg16.6-ts2.17.2';
+/** Планировщик TimescaleDB выключен: политики просыпаются посреди теста, а агрегаты тесты обновляют сами. */
+const NO_BACKGROUND_JOBS = ['postgres', '-c', 'timescaledb.max_background_workers=0'];
 const SUPERUSER = { user: 'postgres', password: 'superuser-pw' };
 const PASSWORDS = { migrator: 'migrator-pw', ingest: 'ingest-pw', api: 'api-pw' };
 
@@ -61,6 +63,7 @@ beforeAll(async () => {
     .withDatabase('fieldstream')
     .withUsername(SUPERUSER.user)
     .withPassword(SUPERUSER.password)
+    .withCommand(NO_BACKGROUND_JOBS)
     .start();
   target = { host: container.getHost(), port: container.getPort(), database: 'fieldstream' };
 

@@ -43,6 +43,8 @@ import type { ProcessorMetrics } from '../../src/metrics/metrics.js';
 import { RAW_GROUP } from '../../src/ingest/raw-consumer.service.js';
 
 const DB_IMAGE = 'timescale/timescaledb-ha:pg16.6-ts2.17.2';
+/** Планировщик TimescaleDB выключен: политики просыпаются посреди теста, а агрегаты тесты обновляют сами. */
+const NO_BACKGROUND_JOBS = ['postgres', '-c', 'timescaledb.max_background_workers=0'];
 const KAFKA_IMAGE = 'apache/kafka:3.9.0';
 const SUPERUSER = { user: 'postgres', password: 'superuser-pw' };
 const PASSWORDS = { migrator: 'migrator-pw', ingest: 'ingest-pw', api: 'api-pw' };
@@ -255,6 +257,7 @@ beforeAll(async () => {
       .withDatabase('fieldstream')
       .withUsername(SUPERUSER.user)
       .withPassword(SUPERUSER.password)
+      .withCommand(NO_BACKGROUND_JOBS)
       .start(),
     new GenericContainer(KAFKA_IMAGE)
       .withExposedPorts({ container: 29092, host: hostPort })

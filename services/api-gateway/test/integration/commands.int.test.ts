@@ -23,6 +23,8 @@ import { loadEnv } from '../../src/config/env.js';
 import { createMetrics } from '../../src/metrics/metrics.js';
 
 const IMAGE = 'timescale/timescaledb-ha:pg16.6-ts2.17.2';
+/** Планировщик TimescaleDB выключен: политики просыпаются посреди теста, а агрегаты тесты обновляют сами. */
+const NO_BACKGROUND_JOBS = ['postgres', '-c', 'timescaledb.max_background_workers=0'];
 const SUPERUSER = { user: 'postgres', password: 'superuser-pw' };
 const PASSWORDS = { migrator: 'migrator-pw', ingest: 'ingest-pw', api: 'api-pw' };
 const SECRET = 'секрет стенда длиной не меньше тридцати двух символов';
@@ -72,6 +74,7 @@ beforeAll(async () => {
     .withDatabase('fieldstream')
     .withUsername(SUPERUSER.user)
     .withPassword(SUPERUSER.password)
+    .withCommand(NO_BACKGROUND_JOBS)
     .start();
   const target = { host: container.getHost(), port: container.getPort(), database: 'fieldstream' };
 
