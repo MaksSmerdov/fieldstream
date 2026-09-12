@@ -18,6 +18,7 @@ import {
   seriesQuerySchema,
 } from '@fieldstream/contracts';
 import type {
+  AlarmRuleAuditResponse,
   AlarmRulesResponse,
   AlarmRulesUpdateResponse,
   DeviceEventsResponse,
@@ -27,6 +28,7 @@ import type {
   SeriesResponse,
 } from '@fieldstream/contracts';
 import {
+  loadAlarmRuleAudit,
   loadDeviceAlarmRules,
   loadDeviceEvents,
   loadDeviceSnapshot,
@@ -46,6 +48,9 @@ const STALE_CYCLES = 3;
 
 /** Потолок происшествий за окно: неделя оттаек на дюжине приборов в него укладывается с запасом. */
 const EVENTS_LIMIT = 500;
+
+/** Сколько правок уставок показывать: журнал на экране, а не выгрузка за всё время. */
+const AUDIT_LIMIT = 50;
 
 @Controller('devices')
 export class DevicesController {
@@ -166,6 +171,20 @@ export class DevicesController {
     }
 
     return { deviceCode: code, rules };
+  }
+
+  /**
+   * Журнал правок уставок. Читать его может всякий, кто видит прибор: след правки полезен
+   * ровно тем, что виден не только тому, кто правил.
+   */
+  @Get(':code/alarm-rules/audit')
+  @RequirePermission('devices')
+  public async alarmRuleAudit(@Param('code') code: string): Promise<AlarmRuleAuditResponse> {
+    const items = await withClient(this.pool, (client) =>
+      loadAlarmRuleAudit(client, code, AUDIT_LIMIT),
+    );
+
+    return { deviceCode: code, items, serverTime: toIsoTimestamp(this.clock.now()) };
   }
 
   /**

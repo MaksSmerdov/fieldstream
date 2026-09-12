@@ -1,0 +1,66 @@
+.rules {
+  padding: 12px 14px;
+  margin-bottom: 16px;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  &__problem {
+    margin-bottom: 12px;
+  }
+
+  &__scroll {
+    overflow-x: auto;
+  }
+
+  &__grid {
+    min-width: 960px;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(150px, 1fr) 110px 104px 104px 110px 84px 190px 80px;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--mui-palette-divider);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &_head {
+      display: grid;
+      grid-template-columns: minmax(150px, 1fr) 110px 104px 104px 110px 84px 190px 80px;
+      gap: 8px;
+      align-items: center;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--mui-palette-divider);
+      color: var(--mui-palette-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.7rem;
+    }
+  }
+
+  &__metric {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__mode {
+    color: var(--mui-palette-text-secondary);
+  }
+}

@@ -1,4 +1,5 @@
 import {
+  alarmRuleAuditResponseSchema,
   alarmRulesResponseSchema,
   alarmRulesUpdateResponseSchema,
   alarmsResponseSchema,
@@ -16,6 +17,7 @@ import {
 } from '@fieldstream/contracts';
 import type {
   AlarmListItem,
+  AlarmRuleAuditResponse,
   AlarmRuleUpdate,
   AlarmRulesResponse,
   AlarmRulesUpdateResponse,
@@ -127,6 +129,11 @@ export const api = {
 
   alarmRules: async (code: string): Promise<AlarmRulesResponse> =>
     request(`/api/devices/${code}/alarm-rules`, (value) => alarmRulesResponseSchema.parse(value)),
+
+  alarmRuleAudit: async (code: string): Promise<AlarmRuleAuditResponse> =>
+    request(`/api/devices/${code}/alarm-rules/audit`, (value) =>
+      alarmRuleAuditResponseSchema.parse(value),
+    ),
 
   updateAlarmRules: async (
     code: string,

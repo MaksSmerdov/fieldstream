@@ -1,18 +1,40 @@
-import { useMemo } from 'react';
-import Typography from '@mui/material/Typography';
+import { useMemo, useState } from 'react';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import { useParams } from 'react-router-dom';
 import { DeviceChart } from '../features/device/components/DeviceChart/DeviceChart.js';
 import { DeviceHeader } from '../features/device/components/DeviceHeader/DeviceHeader.js';
 import { DeviceValues } from '../features/device/components/DeviceValues/DeviceValues.js';
+import { ReadPlanCard } from '../features/device/components/ReadPlanCard/ReadPlanCard.js';
+import { RulesPanel } from '../features/rules/components/RulesPanel/RulesPanel.js';
 import { useDeviceScreen } from '../features/device/hooks/useDeviceScreen.js';
 import { EmptyState } from '../shared/ui/EmptyState/EmptyState.js';
 import { ErrorState } from '../shared/ui/ErrorState/ErrorState.js';
 import { SkeletonBlock } from '../shared/ui/SkeletonBlock/SkeletonBlock.js';
+import styles from './DevicePage.module.scss';
 
-/** Экран прибора: шапка с состоянием, график с полосой режимов и значения по секциям. */
+type Panel = 'values' | 'rules' | 'plan';
+
+/**
+ * Экран прибора: шапка и график всегда сверху, остальное по вкладкам. Уставки и карта
+ * регистров запрашиваются только при открытии своей вкладки: на экране они нужны редко,
+ * а запрос при каждом заходе на прибор стоил бы дороже.
+ */
 export const DevicePage = (): React.JSX.Element => {
   const { code = '' } = useParams();
+  const [panel, setPanel] = useState<Panel>('values');
   const { snapshot, profile, isPending, isError, error, refetch } = useDeviceScreen(code);
+
+  /** Подписи параметров для уставок и карты регистров: в них едут только машинные ключи. */
+  const labels = useMemo(
+    () =>
+      Object.fromEntries(
+        (profile?.sections ?? []).flatMap((section) =>
+          section.params.map((param) => [param.metricKey, param.label]),
+        ),
+      ),
+    [profile],
+  );
 
   /** На графике только числовые параметры: перечисления и слово аварий кривой не рисуются. */
   const plotted = useMemo(
@@ -51,10 +73,21 @@ export const DevicePage = (): React.JSX.Element => {
         <DeviceChart code={code} params={plotted} />
       )}
 
-      <Typography variant="subtitle1" gutterBottom>
-        Значения
-      </Typography>
-      <DeviceValues profile={profile} snapshot={snapshot} />
+      <Tabs
+        value={panel}
+        onChange={(_event, value: Panel) => {
+          setPanel(value);
+        }}
+        className={styles['device__tabs']}
+      >
+        <Tab label="Значения" value="values" />
+        <Tab label="Уставки" value="rules" />
+        <Tab label="Карта регистров" value="plan" />
+      </Tabs>
+
+      {panel === 'values' ? <DeviceValues profile={profile} snapshot={snapshot} /> : null}
+      {panel === 'rules' ? <RulesPanel code={code} labels={labels} /> : null}
+      {panel === 'plan' ? <ReadPlanCard code={code} labels={labels} /> : null}
     </>
   );
 };

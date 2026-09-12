@@ -131,3 +131,41 @@ export const alarmRulesUpdateResponseSchema = z
   })
   .strict();
 export type AlarmRulesUpdateResponse = z.infer<typeof alarmRulesUpdateResponseSchema>;
+
+/** Значение поля уставки в журнале правок: числа, важность, признак включённости. */
+export const alarmRuleFieldValueSchema = z.union([z.number(), z.string(), z.boolean(), z.null()]);
+
+export const alarmRuleAuditFieldSchema = z
+  .object({
+    field: z.string().min(1),
+    before: alarmRuleFieldValueSchema,
+    after: alarmRuleFieldValueSchema,
+  })
+  .strict();
+export type AlarmRuleAuditField = z.infer<typeof alarmRuleAuditFieldSchema>;
+
+/**
+ * Запись журнала правок. Кто и когда менял уставку, видно вместе с самими значениями:
+ * «уставка изменена» без прежнего числа не позволяет понять, что именно произошло.
+ */
+export const alarmRuleAuditEntrySchema = z
+  .object({
+    id: z.string().min(1),
+    metricKey: z.string().min(1),
+    mode: deviceModeSchema,
+    changedBy: z.string().min(1),
+    changedAt: isoTimestampSchema,
+    created: z.boolean(),
+    fields: z.array(alarmRuleAuditFieldSchema),
+  })
+  .strict();
+export type AlarmRuleAuditEntry = z.infer<typeof alarmRuleAuditEntrySchema>;
+
+export const alarmRuleAuditResponseSchema = z
+  .object({
+    deviceCode: deviceCodeSchema,
+    items: z.array(alarmRuleAuditEntrySchema),
+    serverTime: isoTimestampSchema,
+  })
+  .strict();
+export type AlarmRuleAuditResponse = z.infer<typeof alarmRuleAuditResponseSchema>;

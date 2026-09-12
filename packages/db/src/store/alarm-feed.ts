@@ -6,6 +6,8 @@ import type {
   AlarmRuleView,
   AlarmsQuery,
 } from '@fieldstream/contracts';
+import type { AlarmRuleAuditEntry } from '@fieldstream/contracts';
+import { ruleDiff } from '@fieldstream/domain';
 
 interface FeedRow {
   readonly id: string;
@@ -180,21 +182,9 @@ export const loadDeviceAlarmRules = async (
   return result.rows.map(toView);
 };
 
-/** Поля, которые видно в истории правок: сравниваются значения, а не строки JSON. */
-const changedFields = (before: AlarmRuleView | undefined, after: AlarmRuleUpdate): string[] => {
-  if (before === undefined) return [];
-
-  const pairs: readonly [string, unknown, unknown][] = [
-    ['minValue', before.minValue, after.minValue],
-    ['maxValue', before.maxValue, after.maxValue],
-    ['hysteresis', before.hysteresis, after.hysteresis],
-    ['debounceCycles', before.debounceCycles, after.debounceCycles],
-    ['severity', before.severity, after.severity],
-    ['enabled', before.enabled, after.enabled],
-  ];
-
-  return pairs.filter(([, left, right]) => left !== right).map(([field]) => field);
-};
+/** Поля, которые видно в истории правок. Сравнение общее с журналом: расходиться им нельзя. */
+const changedFields = (before: AlarmRuleView | undefined, after: AlarmRuleUpdate): string[] =>
+  ruleDiff(before, after).map((change) => change.field);
 
 export interface AlarmRulesUpdateResult {
   readonly changes: AlarmRuleChange[];
@@ -293,4 +283,46 @@ export const updateDeviceAlarmRules = async (
     await client.query('ROLLBACK').catch(() => undefined);
     throw error;
   }
+};
+
+interface AuditRow {
+  readonly id: string;
+  readonly metric_key: string;
+  readonly mode: AlarmRuleView['mode'];
+  readonly changed_by: string;
+  readonly changed_at: Date;
+  readonly diff: {
+    readonly before: Record<string, unknown> | null;
+    readonly after: Record<string, unknown>;
+  };
+}
+
+/**
+ * Журнал правок уставок прибора. Разница полей считается при чтении из сохранённых снимков
+ * «до» и «после»: так журнал не зависит от того, какие поля умел сравнивать код в день правки.
+ */
+export const loadAlarmRuleAudit = async (
+  client: pg.ClientBase,
+  deviceCode: string,
+  limit: number,
+): Promise<AlarmRuleAuditEntry[]> => {
+  const result = await client.query<AuditRow>(
+    `SELECT a.id::text AS id, a.metric_key, a.mode, a.changed_by, a.changed_at, a.diff
+     FROM core.alarm_rule_audit a
+     JOIN core.devices d ON d.id = a.device_id
+     WHERE d.code = $1
+     ORDER BY a.changed_at DESC, a.id DESC
+     LIMIT $2`,
+    [deviceCode, limit],
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    metricKey: row.metric_key,
+    mode: row.mode,
+    changedBy: row.changed_by,
+    changedAt: row.changed_at.toISOString(),
+    created: row.diff.before === null,
+    fields: ruleDiff(row.diff.before, row.diff.after),
+  }));
 };
