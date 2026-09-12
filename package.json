@@ -39,5 +39,6 @@
     "overrides": {
       "fastify": "^5.12.4"
     }
-  }
+  },
+  "license": "MIT"
 }
