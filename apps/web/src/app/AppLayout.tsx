@@ -7,6 +7,8 @@ import Tabs from '@mui/material/Tabs';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom';
+import { useLivePatch } from '../shared/sse/useLivePatch.js';
+import { LiveBanner } from '../shared/ui/LiveBanner/LiveBanner.js';
 import { useThemeMode } from './theme-mode.js';
 import styles from './AppLayout.module.scss';
 
@@ -18,10 +20,16 @@ const sectionOf = (pathname: string): string => {
   return '/';
 };
 
+/**
+ * Оболочка держит единственное соединение живого канала на вкладку. Подписка без ключей это
+ * весь доступный стенд: на двадцати четырёх приборах дробить её по экранам нечего, а второе
+ * соединение с той же вкладки стоило бы дороже, чем экономия событий.
+ */
 export const AppLayout = (): React.JSX.Element => {
   const { pathname } = useLocation();
   const { mode, toggle } = useThemeMode();
   const section = sectionOf(pathname);
+  useLivePatch([]);
 
   return (
     <Box className={styles['layout']}>
@@ -53,6 +61,7 @@ export const AppLayout = (): React.JSX.Element => {
       </AppBar>
 
       <Container maxWidth="xl" component="main" className={styles['layout__content']}>
+        <LiveBanner />
         <Outlet />
       </Container>
     </Box>

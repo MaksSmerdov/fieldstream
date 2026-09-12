@@ -1,0 +1,16 @@
+.value {
+  color: var(--mui-palette-text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  &_stale {
+    color: var(--mui-palette-text-disabled);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &_substituted {
+    color: var(--mui-palette-warning-main);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+}

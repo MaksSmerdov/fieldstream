@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 const noWallClock = {
@@ -60,6 +61,7 @@ export default tseslint.config(
   },
   {
     files: ['apps/web/**/*.ts', 'apps/web/**/*.tsx'],
+    plugins: { 'react-hooks': reactHooks },
     languageOptions: {
       parserOptions: {
         project: ['./apps/web/tsconfig.test.json'],
@@ -74,6 +76,8 @@ export default tseslint.config(
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
       '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
       'no-console': 'error',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
       // Время во фронте берётся только из shared/time/serverClock: часы браузера и сервера расходятся
       'no-restricted-syntax': ['error', noWallClock, noBareNewDate],
     },
