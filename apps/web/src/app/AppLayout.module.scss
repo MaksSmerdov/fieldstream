@@ -37,7 +37,11 @@
 
   &__theme {
     flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    padding: 0;
     font-size: 18px;
+    line-height: 1;
   }
 
   &__content {

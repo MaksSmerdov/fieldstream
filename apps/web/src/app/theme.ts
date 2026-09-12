@@ -18,6 +18,11 @@ export const createAppTheme = (mode: 'light' | 'dark'): Theme =>
         default: mode === 'dark' ? '#0f1419' : '#f4f6f8',
         paper: mode === 'dark' ? '#161b22' : '#ffffff',
       },
+      text:
+        mode === 'dark'
+          ? { primary: '#e6edf3', secondary: '#9fb0bf' }
+          : { primary: '#17212b', secondary: '#48596a' },
+      divider: mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(23, 33, 43, 0.18)',
     },
     shape: { borderRadius: 8 },
     typography: {
@@ -27,7 +32,32 @@ export const createAppTheme = (mode: 'light' | 'dark'): Theme =>
     },
     components: {
       MuiCssBaseline: {
-        styleOverrides: { body: { margin: 0, minHeight: '100vh' } },
+        styleOverrides: {
+          body: { margin: 0, minHeight: '100vh' },
+          '*:focus:not(:focus-visible)': { outline: 'none' },
+        },
+      },
+      MuiTooltip: {
+        defaultProps: { arrow: true },
+        styleOverrides: {
+          tooltip: {
+            maxWidth: 300,
+            padding: '8px 10px',
+            fontSize: 12,
+            lineHeight: 1.55,
+            textAlign: 'left',
+            whiteSpace: 'pre-line',
+          },
+        },
+      },
+      MuiSelect: {
+        defaultProps: {
+          MenuProps: {
+            anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+            transformOrigin: { vertical: 'top', horizontal: 'left' },
+            slotProps: { paper: { sx: { maxHeight: 320 } } },
+          },
+        },
       },
     },
   });

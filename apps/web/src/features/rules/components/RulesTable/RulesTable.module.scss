@@ -48,6 +48,7 @@
       padding-bottom: 6px;
       border-bottom: 1px solid var(--mui-palette-divider);
       color: var(--mui-palette-text-secondary);
+      text-align: center;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       font-size: 0.7rem;
@@ -56,11 +57,13 @@
 
   &__metric {
     overflow: hidden;
+    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   &__mode {
     color: var(--mui-palette-text-secondary);
+    text-align: center;
   }
 }

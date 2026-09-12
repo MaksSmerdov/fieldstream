@@ -1,8 +1,9 @@
 .session {
   &__button {
-    text-transform: none;
     max-width: 200px;
+    padding-inline: 10px;
     overflow: hidden;
+    font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -11,7 +12,19 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 6px 16px 8px;
-    list-style: none;
+    min-width: 220px;
+    padding: 10px 16px 12px;
+  }
+
+  &__role {
+    display: inline-flex;
+    align-self: flex-start;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--mui-palette-action-selected);
+    color: var(--mui-palette-text-secondary);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
   }
 }

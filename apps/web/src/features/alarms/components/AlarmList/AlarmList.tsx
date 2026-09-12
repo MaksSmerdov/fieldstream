@@ -104,8 +104,7 @@ export const AlarmList = ({ items, canAck, pendingId, onAck }: Props): React.JSX
             )
           ) : (
             <Tooltip
-              title={`подтвердил ${item.ackedBy}, ${momentText(item.ackedAt)}`}
-              arrow
+              title={`Подтвердил: ${item.ackedBy}\n${momentText(item.ackedAt)}`}
               describeChild
             >
               {/* В колонку влезает имя, а не адрес целиком: полный адрес лежит в подсказке */}

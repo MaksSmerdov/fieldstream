@@ -10,13 +10,17 @@ import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom';
 import { SessionMenu } from '../features/auth/components/SessionMenu/SessionMenu.js';
 import { useLivePatch } from '../shared/sse/useLivePatch.js';
 import { LiveBanner } from '../shared/ui/LiveBanner/LiveBanner.js';
+import { ThemeIcon } from '../shared/ui/ThemeIcon/ThemeIcon.js';
 import { useThemeMode } from './theme-mode.js';
 import styles from './AppLayout.module.scss';
 
-/** Раздел, в котором сейчас находится пользователь: по нему подсвечивается вкладка. */
-const sectionOf = (pathname: string): string => {
+/**
+ * Раздел, в котором сейчас находится пользователь. У экрана прибора своей вкладки нет:
+ * приборов двадцать четыре, и попадают на них из обзора, поэтому там не подсвечено ничего.
+ */
+const sectionOf = (pathname: string): string | false => {
   if (pathname.startsWith('/alarms')) return '/alarms';
-  if (pathname.startsWith('/device')) return '/device';
+  if (pathname.startsWith('/device')) return false;
 
   return '/';
 };
@@ -47,7 +51,6 @@ export const AppLayout = (): React.JSX.Element => {
           <Tabs value={section} className={styles['layout__tabs']}>
             <Tab label="Обзор" value="/" component={RouterLink} to="/" />
             <Tab label="Алармы" value="/alarms" component={RouterLink} to="/alarms" />
-            {section === '/device' ? <Tab label="Прибор" value="/device" /> : null}
           </Tabs>
 
           <div className={styles['layout__session']}>
@@ -56,7 +59,7 @@ export const AppLayout = (): React.JSX.Element => {
               aria-label={mode === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
               className={styles['layout__theme']}
             >
-              {mode === 'dark' ? '☀' : '☾'}
+              <ThemeIcon mode={mode} />
             </IconButton>
 
             <SessionMenu />

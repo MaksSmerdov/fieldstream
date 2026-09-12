@@ -59,9 +59,7 @@ export const SessionMenu = (): React.JSX.Element | null => {
       >
         <li className={styles['session__who']}>
           <Typography variant="body2">{user.email}</Typography>
-          <Typography variant="caption" color="text.secondary">
-            права: {ROLE_LABEL[user.role]}
-          </Typography>
+          <span className={styles['session__role']}>{ROLE_LABEL[user.role]}</span>
         </li>
         <Divider />
         <MenuItem

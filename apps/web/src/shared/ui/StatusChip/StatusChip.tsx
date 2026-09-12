@@ -43,19 +43,19 @@ const LABEL: Readonly<Record<HealthStatus, string>> = {
  */
 export const StatusChip = ({ status, reason, since, lastOkAt }: Props): React.JSX.Element => {
   const lines = [
-    `причина: ${REASON_TEXT[reason]}`,
-    since == null ? null : `в этом состоянии ${agoText(since, 'неизвестно сколько')}`,
-    lastOkAt == null ? null : `последний удачный опрос ${momentText(lastOkAt)}`,
+    `Причина: ${REASON_TEXT[reason]}`,
+    since == null ? null : `В этом состоянии: ${agoText(since, 'неизвестно сколько')}`,
+    lastOkAt == null ? null : `Последний удачный опрос: ${momentText(lastOkAt)}`,
   ].filter((line): line is string => line !== null);
 
   return (
-    <Tooltip title={lines.join('. ')} arrow describeChild>
+    <Tooltip title={lines.join('\n')} describeChild>
       <Chip
         size="small"
         color={COLOR[status]}
         label={LABEL[status]}
         className={styles['status']}
-        variant={status === 'unknown' ? 'outlined' : 'filled'}
+        variant="outlined"
       />
     </Tooltip>
   );

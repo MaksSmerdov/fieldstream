@@ -10,6 +10,7 @@
     padding: 8px 0;
     border-bottom: 1px solid var(--mui-palette-divider);
     color: var(--mui-palette-text-secondary);
+    text-align: center;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-size: 0.7rem;
@@ -23,6 +24,7 @@
     min-width: 1060px;
     min-height: 44px;
     border-bottom: 1px solid var(--mui-palette-divider);
+    text-align: center;
 
     &:last-child {
       border-bottom: none;
@@ -32,6 +34,7 @@
   &__moment {
     color: var(--mui-palette-text-secondary);
     font-variant-numeric: tabular-nums;
+    text-align: left;
     white-space: nowrap;
   }
 
@@ -46,6 +49,7 @@
 
   &__metric {
     overflow: hidden;
+    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -56,6 +60,7 @@
 
   &__value {
     font-variant-numeric: tabular-nums;
+    text-align: left;
   }
 
   &__duration {
