@@ -209,6 +209,47 @@ describe('вход и сессии на настоящей базе', () => {
     expect(codes.slice(stopped).every((code) => code === 429)).toBe(true);
   });
 
+  /**
+   * За обратным прокси адрес запроса это адрес прокси. Без доверия к его заголовкам все
+   * попытки входа со стенда попадали бы в одно ведро, и один подбирающий пароль закрывал бы
+   * вход всем остальным.
+   */
+  it('за прокси ограничитель считает попытки по адресу клиента, а не по адресу прокси', async () => {
+    const trusting = await createApp({
+      env: loadEnv({
+        FS_API_PASSWORD: PASSWORDS.api,
+        AUTH_SECRET: SECRET,
+        TRUST_PROXY: 'on',
+        LOGIN_ATTEMPTS: '100',
+        LOGIN_IP_ATTEMPTS: '3',
+        LOGIN_REFILL_MS: '30000',
+        SSE_BRIDGE: 'off',
+      }),
+      log: createLogger('api-gateway', 'fatal'),
+      clock,
+      metrics: createMetrics(),
+      pool,
+      instanceId: 'proxy-test',
+    });
+    await trusting.listen(0, '127.0.0.1');
+    const url = await trusting.getUrl();
+
+    const attempt = (ip: string): Promise<Response> =>
+      fetch(`${url}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+        body: JSON.stringify({ email: 'stranger@fieldstream.local', password: 'подбор пароля' }),
+      });
+
+    const codes: number[] = [];
+    for (let index = 0; index < 4; index += 1) codes.push((await attempt('203.0.113.9')).status);
+    const neighbour = (await attempt('203.0.113.10')).status;
+    await trusting.close();
+
+    expect(codes.at(-1)).toBe(429);
+    expect(neighbour).toBe(401);
+  });
+
   it('токен доступа открывает свои данные, а без него ответа нет', async () => {
     const { body } = await login('viewer@fieldstream.local');
 

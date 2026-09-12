@@ -90,7 +90,6 @@ services:
       args:
         SERVICE: seed
     image: fieldstream/seed:dev
-    profiles: ['seed']
     env_file: ../../.env
     environment:
       DATABASE_HOST: timescaledb
@@ -164,14 +163,25 @@ services:
     environment:
       KAFKA_BROKERS: kafka:9092
       DATABASE_HOST: timescaledb
-    ports:
-      - '8093:8093'
+      TRUST_PROXY: 'on'
     depends_on:
       kafka-init:
         condition: service_completed_successfully
       migrator:
         condition: service_completed_successfully
     stop_grace_period: 30s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+    image: fieldstream/web:dev
+    ports:
+      - '8080:8080'
+    depends_on:
+      api-gateway:
+        condition: service_healthy
     restart: unless-stopped
 
   kafka-ui:
