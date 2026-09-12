@@ -16,7 +16,7 @@ const violationsOf = async (page: Page): Promise<string[]> => {
 
   return result.violations.map(
     (violation) =>
-      `${violation.id} (${violation.impact ?? 'без оценки'}): ${violation.help} — ${String(violation.nodes.length)} узла`,
+      `${violation.id} (${violation.impact ?? 'без оценки'}): ${violation.help}, узлов ${String(violation.nodes.length)}`,
   );
 };
 
