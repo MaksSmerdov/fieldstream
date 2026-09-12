@@ -2,8 +2,8 @@ import { createTheme } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 
 /**
- * Тема как источник токенов. Переменные MUI выводятся в CSS, поэтому свои стили на SCSS-модулях
- * берут те же цвета, что и готовые компоненты, и тёмная тема не расходится наполовину.
+ * Тема как источник токенов. Переменные MUI выводятся в CSS, и стили на SCSS-модулях берут
+ * те же цвета, что готовые компоненты.
  */
 export const createAppTheme = (mode: 'light' | 'dark'): Theme =>
   createTheme({

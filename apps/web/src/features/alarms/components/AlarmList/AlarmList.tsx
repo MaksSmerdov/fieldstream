@@ -47,10 +47,7 @@ const boundaryText = (item: AlarmListItem): string => {
   return `${value} ${sign} уставки ${threshold}`;
 };
 
-/**
- * Лента эпизодов. Строка объясняет не только «что сработало», но и насколько: без значения
- * и уставки рядом эпизод не отличить от соседнего, а именно этим они и различаются.
- */
+/** Лента эпизодов. Значение и уставка стоят рядом: этим соседние эпизоды и различаются. */
 export const AlarmList = ({ items, canAck, pendingId, onAck }: Props): React.JSX.Element => (
   <Paper variant="outlined" className={styles['feed']}>
     <div className={styles['feed__head']}>

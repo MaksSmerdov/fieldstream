@@ -12,10 +12,7 @@ interface State {
   readonly error: Error | null;
 }
 
-/**
- * Последняя защита экрана. Ошибка рендера не должна оставлять белый лист: видно, что случилось,
- * и есть кнопка, которой человек может продолжить работу.
- */
+/** Последняя защита экрана: вместо белого листа видно, что случилось, и есть кнопка продолжить. */
 export class ErrorBoundary extends Component<Props, State> {
   public override state: State = { error: null };
 

@@ -12,10 +12,7 @@ export const commandRequestSchema = z
   .strict();
 export type CommandRequest = z.infer<typeof commandRequestSchema>;
 
-/**
- * Команда принята, но ещё не применена: она лежит в очереди исходящих той же транзакции,
- * в которой её приняли. Дальше её судьбу показывает отдельный запрос.
- */
+/** Команда принята, но ещё не применена: она лежит в очереди исходящих. */
 export const commandAcceptedSchema = z
   .object({
     commandId: z.string().uuid(),

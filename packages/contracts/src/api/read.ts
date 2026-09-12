@@ -29,10 +29,7 @@ export const topologyDeviceSchema = z
     lastOkAt: isoTimestampSchema.nullable(),
     activeAlarms: z.number().int().min(0),
     worstSeverity: severitySchema.nullable(),
-    /**
-     * Значения прибора устарели. Решает сервер по такту опроса линии, фронт только рисует
-     * прочерк: иначе каждый экран решал бы сам, что такое «давно не было данных».
-     */
+    /** Значения устарели. Решает сервер по такту опроса линии, фронт только рисует прочерк. */
     stale: z.boolean(),
     /** Момент последнего значения. Пусто, если за последний час их не было вовсе. */
     staleSince: isoTimestampSchema.nullable(),
@@ -92,10 +89,7 @@ export const snapshotMetricSchema = z
   .strict();
 export type SnapshotMetric = z.infer<typeof snapshotMetricSchema>;
 
-/**
- * Снимок прибора. Признак устаревания считает сервер: у браузера свои часы, и без общей
- * точки отсчёта каждый экран решал бы сам, что такое «давно не было данных».
- */
+/** Снимок прибора на текущий момент. */
 export const deviceSnapshotSchema = z
   .object({
     deviceCode: deviceCodeSchema,
@@ -139,10 +133,7 @@ export const seriesMetricSchema = z
   .strict();
 export type SeriesMetric = z.infer<typeof seriesMetricSchema>;
 
-/**
- * Откуда взяты данные и с каким шагом. Эти же поля показывает бейдж под графиком:
- * подпись не может разойтись с источником, потому что приходит вместе с данными.
- */
+/** Откуда взяты данные и с каким шагом. Эти же поля показывает подпись под графиком. */
 export const seriesMetaSchema = z
   .object({
     source: seriesSourceSchema,
@@ -194,10 +185,7 @@ export const readPlanBlockSchema = z
   })
   .strict();
 
-/**
- * Карта регистров прибора в двух видах. Разница между merged и naive это и есть выигрыш
- * склейки блоков: на экране видно, сколько запросов уходит на линию в каждом случае.
- */
+/** Карта регистров в двух видах: merged со склейкой блоков, naive без неё. */
 export const readPlanResponseSchema = z
   .object({
     deviceCode: deviceCodeSchema,
@@ -240,10 +228,7 @@ export const profileSectionViewSchema = z
   })
   .strict();
 
-/**
- * Описание модели прибора для экрана: секции в том же порядке, что у профиля, чтобы
- * значения группировались так же, как их видит инженер в документации на прибор.
- */
+/** Описание модели для экрана. Секции идут в том же порядке, что в документации на прибор. */
 export const deviceProfileViewSchema = z
   .object({
     deviceCode: deviceCodeSchema,
@@ -271,9 +256,8 @@ export const deviceEventItemSchema = z
 export type DeviceEventItem = z.infer<typeof deviceEventItemSchema>;
 
 /**
- * Происшествия прибора за окно. Отрезки режимов считает сервер: режим на начало окна
- * определяется последней сменой до него, и без этой строки первый отрезок пришлось бы
- * додумывать на фронте.
+ * Происшествия прибора за окно. Режим на начало окна едет отдельной строкой: его задаёт
+ * последняя смена до окна, а её в выборке уже нет.
  */
 export const deviceEventsResponseSchema = z
   .object({

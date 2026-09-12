@@ -4,8 +4,8 @@ export const roleSchema = z.enum(['viewer', 'engineer', 'admin']);
 export type Role = z.infer<typeof roleSchema>;
 
 /**
- * Единица доступа. Одно и то же имя служит тремя вещами сразу: правом в guard на сервере,
- * ключом подписки живого канала и условием маршрута на фронте, поэтому разойтись им негде.
+ * Единица доступа. Право в guard, ключ подписки живого канала и условие маршрута на фронте
+ * это одно и то же имя.
  */
 export const MODULES = [
   'overview',
@@ -41,10 +41,7 @@ export const ROLE_MODULES: Readonly<Record<Role, readonly ModuleId[]>> = Object.
   admin: MODULES,
 });
 
-/**
- * Действующие права: роль плюс личные разрешения минус личные запреты. Запрет сильнее
- * разрешения, поэтому отобрать доступ можно всегда, не трогая роль.
- */
+/** Действующие права: роль плюс личные разрешения минус личные запреты. Запрет сильнее разрешения. */
 export const getEffectivePermissions = (
   role: Role,
   grants: readonly ModuleId[] = [],

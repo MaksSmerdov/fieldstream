@@ -34,11 +34,7 @@ const valueText = (value: number | string | boolean | null): string => {
   return WORDS[String(value)] ?? String(value);
 };
 
-/**
- * Журнал правок уставок. Показываются прежнее и новое значение каждого поля: запись
- * «уставка изменена» не позволяет понять, что именно произошло, а именно за этим в журнал
- * и приходят.
- */
+/** Журнал правок уставок: у каждого поля видно прежнее и новое значение. */
 export const RulesAudit = ({ items, labels }: Props): React.JSX.Element => (
   <Paper variant="outlined" className={styles['audit']}>
     <Typography variant="subtitle2" className={styles['audit__title']}>

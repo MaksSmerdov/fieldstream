@@ -6,10 +6,7 @@ import styles from './LiveBanner.module.scss';
 const clock = (atMs: number | null): string =>
   atMs === null ? 'данных ещё не было' : `данные от ${new Date(atMs).toLocaleTimeString('ru-RU')}`;
 
-/**
- * Баннер живого канала. Показанные числа при обрыве остаются верными, но их возраст надо
- * назвать: молча оставлять экран «живым» хуже, чем честно сказать, что обновлений нет.
- */
+/** Баннер живого канала: при обрыве числа остаются верными, но их возраст надо назвать. */
 export const LiveBanner = (): React.JSX.Element | null => {
   const status = useLiveStore((state) => state.status);
   const lastFrameAtMs = useLiveStore((state) => state.lastFrameAtMs);

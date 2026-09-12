@@ -4,10 +4,7 @@ import { isoTimestampSchema } from '../primitives.js';
 export const bootStageStatusSchema = z.enum(['pending', 'running', 'done', 'failed']);
 export type BootStageStatus = z.infer<typeof bootStageStatusSchema>;
 
-/**
- * Стадия готовности стенда. Первый запуск занимает минуты, и загрузочная панель показывает,
- * чего именно ждать, вместо пустых экранов с нулями.
- */
+/** Стадия готовности стенда. Первый запуск занимает минуты, и панель показывает, чего ждать. */
 export const bootStageViewSchema = z
   .object({
     stage: z.string().min(1),

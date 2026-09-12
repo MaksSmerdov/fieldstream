@@ -1,8 +1,6 @@
 /**
- * Правило выбора источника серии. Одна и та же чистая функция живёт на сервере и на фронте,
- * поэтому подпись под графиком не может разойтись с тем, откуда данные взяты на самом деле.
- * Это прямое лечение двух болячек сразу: эндпоинта без limit и фронта,
- * перезапрашивающего всё окно чаще, чем данные вообще меняются.
+ * Правило выбора источника серии. Функция общая для сервера и фронта, так что подпись под
+ * графиком не расходится с тем, откуда числа взяты на самом деле.
  */
 export type SeriesSource = 'readings' | 'readings_1m' | 'readings_1h';
 
@@ -11,7 +9,7 @@ export interface SeriesPlan {
   /** Шаг агрегации в миллисекундах. */
   bucketMs: number;
   points: number;
-  /** Окно прорежено: точек в ответе меньше, чем отсчётов в источнике. */
+  /** В источнике отсчётов больше, чем точек в ответе. */
   truncated: boolean;
 }
 
@@ -38,8 +36,6 @@ export const pickSource = (rangeMs: number, maxPoints = MAX_SERIES_POINTS): Seri
     source === 'readings' ? 10_000 : source === 'readings_1m' ? MINUTE_MS : HOUR_MS;
   const bucketMs = roundBucket(rangeMs / maxPoints, minBucketMs);
   const points = Math.ceil(rangeMs / bucketMs);
-  // Прорежено: в источнике отсчётов больше, чем точек в ответе. Шаг всегда кратен разрешению
-  // источника, поэтому число точек само по себе предела не превышает, и сравнивать надо с ним.
   const available = Math.ceil(rangeMs / minBucketMs);
 
   return { source, bucketMs, points, truncated: available > points };

@@ -10,10 +10,7 @@ import { SERVER_TIME_HEADER, registerServerTime } from './common/server-time.js'
 /** Маршруты обслуживания живут вне префикса: их зовут healthcheck контейнера и сборщик метрик. */
 const UNPREFIXED = ['health/live', 'health/ready', 'metrics'];
 
-/**
- * Собранное приложение без запуска: точка входа и тесты поднимают одно и то же,
- * поэтому проверенное тестом поведение заголовков и префиксов совпадает с рабочим.
- */
+/** Собранное приложение без запуска: точка входа и тесты поднимают одно и то же. */
 export const createApp = async (deps: AppDeps): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.register(deps),

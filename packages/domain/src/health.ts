@@ -179,10 +179,7 @@ const buildLineNode = (line: LineHealthInput, input: BuildHealthTreeInput): Heal
   };
 };
 
-/**
- * Узел шлюза. Асимметрия намеренная: молчание всех линий не доказывает,
- * что мёртв сам шлюз, поэтому вместо offline ставится unknown.
- */
+/** Узел шлюза. Молчание всех линий даёт unknown, см. правило свода выше. */
 const buildGatewayNode = (gateway: GatewayHealthInput, input: BuildHealthTreeInput): HealthNode => {
   const lines = gateway.lines.map((line) => buildLineNode(line, input));
   const verdict = withoutFalseOffline(aggregate(lines));
@@ -200,11 +197,7 @@ const buildGatewayNode = (gateway: GatewayHealthInput, input: BuildHealthTreeInp
   };
 };
 
-/**
- * Строит дерево здоровья site -> gateway -> line -> device на один момент времени.
- * Полностью мёртвая площадка показывается как unknown, а не offline: по молчанию линий
- * нельзя судить о живости вышестоящих узлов, правило то же самое, что у шлюза.
- */
+/** Строит дерево здоровья site -> gateway -> line -> device на один момент времени. */
 export const buildHealthTree = (input: BuildHealthTreeInput): HealthNode => {
   const gateways = input.site.gateways.map((gateway) => buildGatewayNode(gateway, input));
   const verdict = withoutFalseOffline(aggregate(gateways));

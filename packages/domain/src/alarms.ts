@@ -23,9 +23,8 @@ export type MetricAlarmState =
       threshold: number;
       raisedAt: number;
       /**
-       * Режим, в котором аларм подняли. Часть ключа эпизода, поэтому снятие обязано назвать
-       * именно его: прибор к этому моменту может быть уже в другом режиме, и подставленный
-       * текущий режим дал бы другой ключ, а эпизод остался бы незакрытым навсегда.
+       * Режим, в котором аларм подняли. Он входит в ключ эпизода, и снятие называет именно его:
+       * с текущим режимом прибора ключ вышел бы другой, а эпизод остался бы незакрытым.
        */
       mode: DeviceMode;
     };
@@ -124,10 +123,7 @@ const rulesForMode = (input: EvaluateDeviceAlarmsInput): Map<string, AlarmRule> 
   return byMetric;
 };
 
-/**
- * Пересчитывает алармы прибора за один цикл опроса. Чистая функция: входное состояние
- * не мутируется, новое возвращается рядом с упорядоченным списком переходов.
- */
+/** Пересчитывает алармы прибора за цикл опроса и возвращает новое состояние с переходами. */
 export const evaluateDeviceAlarms = (input: EvaluateDeviceAlarmsInput): DeviceAlarmEvaluation => {
   const rules = rulesForMode(input);
   const muted = MUTED_MODES.includes(input.mode);

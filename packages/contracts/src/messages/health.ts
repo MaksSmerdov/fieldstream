@@ -4,10 +4,7 @@ import { isoTimestampSchema } from '../primitives.js';
 export const healthStatusSchema = z.enum(['online', 'degraded', 'offline', 'unknown']);
 export type HealthStatus = z.infer<typeof healthStatusSchema>;
 
-/**
- * Машинная причина статуса. Смысл в том, чтобы интерфейс показывал не только цвет,
- * но и повод, а тесты проверяли конкретный переход, а не «стало красным».
- */
+/** Машинная причина статуса: интерфейс показывает повод, а тест проверяет конкретный переход. */
 export const healthReasonSchema = z.enum([
   'ok',
   'consecutive_errors',

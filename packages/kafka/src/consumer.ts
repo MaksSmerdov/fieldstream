@@ -58,10 +58,7 @@ export type Decoded<T> =
   | { readonly ok: true; readonly payload: T }
   | { readonly ok: false; readonly errorClass: DecodeFailure; readonly error: string };
 
-/**
- * Разбор сообщения на входе: чужим данным не доверяем. Неудача разбора это повод
- * отправить сообщение в очередь недоставленных, а не остановить обработку партиции.
- */
+/** Разбор сообщения на входе. Неразобранное уходит в очередь недоставленных, партиция идёт дальше. */
 export const decodeMessage = <S extends z.ZodTypeAny>(
   spec: TopicSpec<S>,
   value: Buffer | null,

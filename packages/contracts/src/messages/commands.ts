@@ -7,10 +7,7 @@ import {
 } from '../primitives.js';
 import { planModeSchema } from '../topology/device.js';
 
-/**
- * Команды линии. Все четыре меняют режим опроса, а не пишут в регистры прибора,
- * поэтому повторное применение безвредно и специальной защиты от повтора не требует.
- */
+/** Команды линии. Все четыре меняют режим опроса и в регистры не пишут, поэтому повтор безвреден. */
 export const commandKindSchema = z.enum([
   'line.enable',
   'line.disable',
@@ -27,10 +24,7 @@ export const commandArgsSchema = z
   .strict();
 export type CommandArgs = z.infer<typeof commandArgsSchema>;
 
-/**
- * Операторская команда. Ключ топика это площадка: команды одной площадке применяются
- * по порядку, а сборщик чужие просто пропускает.
- */
+/** Операторская команда. Ключ топика это площадка, чужие команды сборщик пропускает. */
 export const deviceCommandSchema = z
   .object({
     schema: z.literal('device.command'),
@@ -68,10 +62,7 @@ export type DeviceCommand = z.infer<typeof deviceCommandSchema>;
 export const commandStatusSchema = z.enum(['applied', 'rejected', 'expired']);
 export type CommandStatus = z.infer<typeof commandStatusSchema>;
 
-/**
- * Ответ исполнителя. Сборщик про базу ничего не знает, поэтому факт применения едет
- * обратно через брокер, а в таблицу его переносит процессор.
- */
+/** Ответ исполнителя. Сборщик про базу не знает, факт применения едет обратно через брокер. */
 export const commandResultSchema = z
   .object({
     schema: z.literal('device.command.result'),

@@ -73,10 +73,7 @@ export const alarmRulesResponseSchema = z
   .strict();
 export type AlarmRulesResponse = z.infer<typeof alarmRulesResponseSchema>;
 
-/**
- * Правка уставки. Удаления нет намеренно: выключенная уставка остаётся в истории правок,
- * а у роли интерфейса на таблицу алармов нет права удалять что бы то ни было.
- */
+/** Правка уставки. Удалить уставку нельзя, только выключить: журнал правок должен остаться целым. */
 export const alarmRuleUpdateSchema = z
   .object({
     metricKey: z.string().min(1),
@@ -144,10 +141,7 @@ export const alarmRuleAuditFieldSchema = z
   .strict();
 export type AlarmRuleAuditField = z.infer<typeof alarmRuleAuditFieldSchema>;
 
-/**
- * Запись журнала правок. Кто и когда менял уставку, видно вместе с самими значениями:
- * «уставка изменена» без прежнего числа не позволяет понять, что именно произошло.
- */
+/** Запись журнала правок: кто, когда и с какого значения на какое. */
 export const alarmRuleAuditEntrySchema = z
   .object({
     id: z.string().min(1),

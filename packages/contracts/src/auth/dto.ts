@@ -22,10 +22,7 @@ export const sessionUserSchema = z
   .strict();
 export type SessionUser = z.infer<typeof sessionUserSchema>;
 
-/**
- * Ответ входа и обновления. Токен доступа живёт в памяти вкладки, токен обновления
- * уходит отдельной cookie и в теле не появляется вообще.
- */
+/** Ответ входа и обновления. Токен обновления уходит отдельной cookie и в теле не появляется. */
 export const sessionResponseSchema = z
   .object({
     accessToken: z.string().min(1),

@@ -37,9 +37,8 @@ export const breakerView = (breaker: Breaker, now: number): BreakerView => {
 export const recordSuccess = (): Breaker => CLOSED_BREAKER;
 
 /**
- * Отказ. До порога только считается; на пороге источник уходит на редкую пробу,
- * а каждая неудачная проба удваивает паузу до потолка. Смысл в том, что мёртвый прибор
- * иначе съедает таймаут на каждом обходе и растягивает цикл всем живым соседям.
+ * Отказ. До порога только считается, на пороге источник уходит на редкую пробу, и каждая
+ * неудачная проба удваивает паузу до потолка. Иначе мёртвый прибор растягивает цикл соседям.
  */
 export const recordFailure = (breaker: Breaker, now: number): Breaker => {
   const failures = breaker.failures + 1;

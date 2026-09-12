@@ -18,10 +18,7 @@ const bitsOf = (param: ProfileParamView, value: number | null): string[] => {
   return param.bits.filter((bit) => (value & (1 << bit.bit)) !== 0).map((bit) => bit.label);
 };
 
-/**
- * Значения прибора по секциям профиля. Порядок и группировка те же, что в документации на
- * прибор: инженер ищет параметр там, где привык, а не в общем алфавитном списке.
- */
+/** Значения прибора по секциям профиля: порядок тот же, что в документации на прибор. */
 export const DeviceValues = ({ profile, snapshot }: Props): React.JSX.Element => {
   const byKey = new Map(snapshot.metrics.map((metric) => [metric.metricKey, metric]));
 

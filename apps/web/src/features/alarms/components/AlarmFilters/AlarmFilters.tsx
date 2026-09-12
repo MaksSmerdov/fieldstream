@@ -31,10 +31,7 @@ const SEVERITY_LABEL: Readonly<Record<Severity | 'all', string>> = {
   critical: 'критическая',
 };
 
-/**
- * Фильтры ленты. Живут в адресе страницы: ссылку на «незакрытые критические по RC-103» можно
- * переслать, и она откроется тем же самым, а не лентой по умолчанию.
- */
+/** Фильтры ленты живут в адресе страницы, поэтому отфильтрованную ленту можно переслать ссылкой. */
 export const AlarmFilters = ({ value, devices, onChange }: Props): React.JSX.Element => (
   <div className={styles['filters']}>
     <ToggleButtonGroup

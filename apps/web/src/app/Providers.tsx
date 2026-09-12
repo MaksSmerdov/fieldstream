@@ -9,10 +9,7 @@ import type { ThemeMode } from './theme-mode.js';
 
 const STORAGE_KEY = 'fieldstream:theme';
 
-/**
- * Кэш серверного состояния. Повторных запросов за тем же окном быть не должно: живые данные
- * патчат кэш точечно, а не заставляют экран перезапрашивать всё заново.
- */
+/** Кэш серверного состояния. Живые данные патчат его точечно, без перезапроса всего окна. */
 const createQueryClient = (): QueryClient =>
   new QueryClient({
     defaultOptions: {

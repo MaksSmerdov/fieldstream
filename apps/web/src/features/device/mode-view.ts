@@ -7,10 +7,7 @@ export const MODE_LABEL: Readonly<Record<DeviceMode, string>> = {
   off: 'выключен',
 };
 
-/**
- * Цвет полосы режима под кривыми. У охлаждения цвета нет: это обычная работа, и закрашивать
- * им весь график значило бы прятать за фоном как раз то, ради чего полоса нужна.
- */
+/** Цвет полосы режима под кривыми. У охлаждения цвета нет: это обычная работа прибора. */
 export const MODE_BAND: Readonly<Record<DeviceMode, string | null>> = {
   cooling: null,
   defrost: 'rgba(255, 180, 70, 0.2)',

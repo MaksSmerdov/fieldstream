@@ -4,10 +4,7 @@ import { healthReasonSchema, healthStatusSchema } from '../messages/health.js';
 import { alarmStateSchema, severitySchema } from '../messages/alarms.js';
 import { deviceModeSchema } from '../topology/device.js';
 
-/**
- * Кадры живого канала. Одна схема на сервере и на клиенте: браузер разбирает ровно то,
- * что шлюз обещал, а не то, что он думает про формат.
- */
+/** Кадры живого канала. Схема общая для шлюза и браузера. */
 export const liveHelloSchema = z
   .object({
     serverTime: isoTimestampSchema,
@@ -84,10 +81,7 @@ export const LIVE_EVENT_KINDS = [
 export const liveEventKindSchema = z.enum(LIVE_EVENT_KINDS);
 export type LiveEventKind = z.infer<typeof liveEventKindSchema>;
 
-/**
- * Разобранный кадр. Разделение по виду события, а не по форме данных: у потока событий
- * вид приходит отдельным полем, и угадывать его по содержимому незачем.
- */
+/** Разобранный кадр. Вид события приходит отдельным полем, по содержимому его не угадывают. */
 export const liveFrameSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('hello'), id: z.string().min(1), data: liveHelloSchema }).strict(),
   z.object({ kind: z.literal('resync'), id: z.string().min(1), data: liveResyncSchema }).strict(),
@@ -100,10 +94,7 @@ export const liveFrameSchema = z.discriminatedUnion('kind', [
 ]);
 export type LiveFrame = z.infer<typeof liveFrameSchema>;
 
-/**
- * Ключ подписки: площадка, линия, прибор или роль. Тот же ключ живёт в событии и в запросе
- * подписки, поэтому набор видов здесь обязан совпадать с тем, что кладёт в событие шлюз.
- */
+/** Ключ подписки: площадка, линия, прибор или роль. Тот же набор видов кладёт в событие шлюз. */
 export const liveSubscriptionKeySchema = z
   .string()
   .regex(/^(site|line|device|role|topic):[A-Za-z0-9._-]+$/, 'ожидается вид device:RC-101');

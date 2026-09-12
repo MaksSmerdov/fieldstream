@@ -5,9 +5,8 @@ import { commandResultSchema, deviceCommandSchema } from '../messages/commands.j
 import { deviceStateSchema, pollCycleSchema } from '../messages/events.js';
 
 /**
- * Единственное место, где описаны топики. Отсюда генерируются конфиг создания топиков,
- * таблица в README и страница контрактов в интерфейсе. Манифест это код, а не документация
- * про код, поэтому разойтись с реальностью он не может.
+ * Единственное место, где описаны топики. Отсюда собирается конфиг создания топиков
+ * и страница контрактов в интерфейсе.
  */
 export interface TopicSpec<S extends z.ZodTypeAny> {
   readonly name: string;

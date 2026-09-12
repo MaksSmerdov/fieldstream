@@ -2,9 +2,8 @@ import { create } from 'zustand';
 import type { SessionUser } from '@fieldstream/contracts';
 
 /**
- * Сессия вкладки. Токен доступа живёт только в памяти: в localStorage его не кладём намеренно,
- * оттуда его достанет любой сторонний скрипт, а после перезагрузки страницы сессия и так
- * восстанавливается по cookie обновления.
+ * Сессия вкладки. Токен доступа живёт только в памяти: из localStorage его достанет любой
+ * сторонний скрипт, а после перезагрузки сессия восстанавливается по cookie обновления.
  */
 export interface SessionState {
   readonly accessToken: string | null;
