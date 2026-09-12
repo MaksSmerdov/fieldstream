@@ -317,3 +317,53 @@ export const loadLineSite = async (
 
   return result.rows[0]?.site_code ?? null;
 };
+
+/** Что известно о готовности стенда: по этим числам собирается загрузочная панель. */
+export interface BootFacts {
+  readonly devices: number;
+  readonly historyRows: number;
+  readonly freshReadingAgeSec: number | null;
+  readonly seededStage: {
+    readonly status: 'pending' | 'running' | 'done' | 'failed';
+    readonly progressPct: number;
+    readonly detail: string | null;
+  } | null;
+}
+
+/**
+ * Факты готовности одним запросом. Считается не «всё ли хорошо», а конкретные числа:
+ * панель решает сама, что показать, и не зависит от чужого представления о готовности.
+ */
+export const loadBootFacts = async (client: pg.ClientBase): Promise<BootFacts> => {
+  const result = await client.query<{
+    devices: string;
+    history_rows: string;
+    fresh_age_sec: string | null;
+    seed_status: 'pending' | 'running' | 'done' | 'failed' | null;
+    seed_pct: number | null;
+    seed_detail: string | null;
+  }>(
+    `SELECT (SELECT count(*) FROM core.devices) AS devices,
+            (SELECT count(*) FROM ts.readings_1h) AS history_rows,
+            (SELECT extract(epoch FROM now() - max(ts))::int FROM ts.readings
+              WHERE ts > now() - INTERVAL '1 hour') AS fresh_age_sec,
+            b.status AS seed_status, b.progress_pct AS seed_pct, b.detail AS seed_detail
+     FROM (SELECT 1) one
+     LEFT JOIN core.boot_progress b ON b.stage = 'history'`,
+  );
+  const row = result.rows[0];
+
+  return {
+    devices: Number(row?.devices ?? 0),
+    historyRows: Number(row?.history_rows ?? 0),
+    freshReadingAgeSec: row?.fresh_age_sec === null ? null : Number(row?.fresh_age_sec),
+    seededStage:
+      row?.seed_status == null
+        ? null
+        : {
+            status: row.seed_status,
+            progressPct: row.seed_pct ?? 0,
+            detail: row.seed_detail,
+          },
+  };
+};

@@ -8,6 +8,7 @@ import { createConsumer, createKafkaClient, decodeMessage } from '@fieldstream/k
 import { createThrottledLog } from '@fieldstream/nest-common';
 import type { Logger } from '@fieldstream/nest-common';
 import type { Env } from '../config/env.js';
+import { DeviceRefsService } from '../topology/device-refs.service.js';
 import { CLOCK, ENV, INSTANCE_ID, LOGGER } from '../tokens.js';
 import { LiveBusService } from './live-bus.service.js';
 
@@ -31,6 +32,7 @@ export class KafkaBridgeService implements OnApplicationBootstrap, BeforeApplica
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(INSTANCE_ID) instanceId: string,
     private readonly bus: LiveBusService,
+    private readonly refs: DeviceRefsService,
   ) {
     const kafka = createKafkaClient({
       clientId: `${env.KAFKA_CLIENT_ID}-${instanceId}`,
@@ -104,13 +106,25 @@ export class KafkaBridgeService implements OnApplicationBootstrap, BeforeApplica
     return Promise.resolve();
   }
 
+  /**
+   * Ключи события: сам прибор, его линия и площадка. Вкладка обзора подписывается на площадку
+   * и не перечисляет двадцать четыре кода, вкладка прибора берёт только свой.
+   */
+  private keysOf(deviceCode: string): string[] {
+    const ref = this.refs.current().get(deviceCode);
+    const keys = [`device:${deviceCode}`];
+    if (ref !== undefined) keys.push(`line:${ref.lineCode}`, `site:${ref.siteCode}`);
+
+    return keys;
+  }
+
   private onReading(reading: TelemetryReading): void {
     const nowMs = this.clock.now();
     const last = this.lastReadingAt.get(reading.deviceCode) ?? 0;
     if (nowMs - last < READING_THROTTLE_MS) return;
     this.lastReadingAt.set(reading.deviceCode, nowMs);
 
-    this.bus.publish('reading', [`device:${reading.deviceCode}`], {
+    this.bus.publish('reading', this.keysOf(reading.deviceCode), {
       deviceCode: reading.deviceCode,
       ts: reading.ts,
       mode: reading.mode,
@@ -120,7 +134,7 @@ export class KafkaBridgeService implements OnApplicationBootstrap, BeforeApplica
   }
 
   private onState(state: DeviceState): void {
-    this.bus.publish('device-state', [`device:${state.deviceCode}`], {
+    this.bus.publish('device-state', this.keysOf(state.deviceCode), {
       deviceCode: state.deviceCode,
       status: state.status,
       reason: state.reason,
@@ -132,7 +146,7 @@ export class KafkaBridgeService implements OnApplicationBootstrap, BeforeApplica
   }
 
   private onAlarm(alarm: AlarmEvent): void {
-    this.bus.publish('alarm', [`device:${alarm.deviceCode}`], {
+    this.bus.publish('alarm', this.keysOf(alarm.deviceCode), {
       alarmId: alarm.alarmId,
       dedupeKey: alarm.dedupeKey,
       deviceCode: alarm.deviceCode,

@@ -201,14 +201,39 @@ describe('живой канал', () => {
   });
 
   it('подписка на прибор отсекает чужие события', async () => {
-    const stream = await open(await tokenFor(['devices']), { query: '?devices=RC-101' });
+    const stream = await open(await tokenFor(['devices']), { query: '?keys=device:RC-101' });
     await stream.next();
 
-    bus.publish('device-state', ['device:RC-102'], { deviceCode: 'RC-102' });
-    bus.publish('device-state', ['device:RC-101'], { deviceCode: 'RC-101' });
+    bus.publish('device-state', ['device:RC-102', 'site:SITE-A'], { deviceCode: 'RC-102' });
+    bus.publish('device-state', ['device:RC-101', 'site:SITE-A'], { deviceCode: 'RC-101' });
 
     const event = await stream.next();
     expect(event.data['deviceCode']).toBe('RC-101');
+
+    stream.close();
+  });
+
+  /** Обзорному экрану нужен весь стенд, и перечислять двадцать четыре кода он не должен. */
+  it('подписка на площадку приносит события всех её приборов', async () => {
+    const stream = await open(await tokenFor(['devices']), { query: '?keys=site:SITE-A' });
+    await stream.next();
+
+    bus.publish('device-state', ['device:PM-301', 'site:SITE-B'], { deviceCode: 'PM-301' });
+    bus.publish('device-state', ['device:RC-107', 'line:L2', 'site:SITE-A'], {
+      deviceCode: 'RC-107',
+    });
+
+    expect((await stream.next()).data['deviceCode']).toBe('RC-107');
+
+    stream.close();
+  });
+
+  it('непонятный ключ подписки не отказ, а просто пропуск', async () => {
+    const stream = await open(await tokenFor(['devices']), { query: '?keys=мусор,device:RC-101' });
+    await stream.next();
+
+    bus.publish('device-state', ['device:RC-101'], { deviceCode: 'RC-101' });
+    expect((await stream.next()).data['deviceCode']).toBe('RC-101');
 
     stream.close();
   });
