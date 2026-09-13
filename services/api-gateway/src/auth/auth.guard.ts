@@ -15,12 +15,16 @@ import type { AccessClaims } from './tokens.js';
 
 const PUBLIC = 'fieldstream:public';
 const MODULE = 'fieldstream:module';
+const QUERY_TOKEN = 'fieldstream:query-token';
 
 /** Маршрут без входа: вход, обновление пары, живость и метрики. */
 export const Public = (): CustomDecorator => SetMetadata(PUBLIC, true);
 
 /** Маршрут требует права на модуль. Имя модуля то же самое, что и на фронте. */
 export const RequirePermission = (module: ModuleId): CustomDecorator => SetMetadata(MODULE, module);
+
+/** Маршрут принимает токен и строкой запроса: только живой канал, EventSource заголовки не умеет. */
+export const QueryToken = (): CustomDecorator => SetMetadata(QUERY_TOKEN, true);
 
 /** Запрос с разобранным токеном доступа. */
 export interface AuthenticatedRequest extends FastifyRequest {
@@ -36,10 +40,11 @@ export const CurrentUser = createParamDecorator(
   },
 );
 
-/** Токен из заголовка, а для живого канала из строки запроса: EventSource заголовки не умеет. */
-const tokenOf = (request: AuthenticatedRequest): string | null => {
+/** Токен из заголовка, а на маршрутах с QueryToken ещё и из строки запроса. */
+const tokenOf = (request: AuthenticatedRequest, allowQuery: boolean): string | null => {
   const header = request.headers.authorization;
   if (typeof header === 'string' && header.startsWith('Bearer ')) return header.slice(7);
+  if (!allowQuery) return null;
 
   const query: unknown = request.query;
   if (typeof query === 'object' && query !== null && 'access_token' in query) {
@@ -64,7 +69,9 @@ export class AuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = tokenOf(request);
+    const allowQuery =
+      this.reflector.getAllAndOverride<boolean | undefined>(QUERY_TOKEN, targets) === true;
+    const token = tokenOf(request, allowQuery);
     if (token === null) throw new UnauthorizedException('нет токена доступа');
 
     const claims = await this.auth.claimsOf(token);

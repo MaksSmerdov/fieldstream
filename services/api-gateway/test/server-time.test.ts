@@ -92,4 +92,17 @@ describe('шлюз отдаёт серверное время', () => {
     expect((await fetch(`${base}/api/events`)).status).toBe(401);
     expect((await fetch(`${base}/api/events?access_token=подделка`)).status).toBe(401);
   });
+
+  /**
+   * Строкой запроса токен принимает только живой канал. На ленте алармов тот же токен
+   * заголовком проходит вход и упирается в права, а строкой запроса не опознаётся вовсе.
+   */
+  it('обычный маршрут не принимает токен из строки запроса', async () => {
+    expect((await fetch(`${base}/api/alarms?access_token=${accessToken}`)).status).toBe(401);
+
+    const withHeader = await fetch(`${base}/api/alarms`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    expect(withHeader.status).toBe(403);
+  });
 });
