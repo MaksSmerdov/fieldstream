@@ -32,7 +32,7 @@
 Нужны Docker, Node 22 и pnpm 10.
 
 ```bash
-cp .env.example .env  # задать пароли: POSTGRES_PASSWORD и три пароля ролей базы
+cp .env.example .env  # заполнить пустые значения: пароли базы и секрет AUTH_SECRET
 pnpm stack:up         # Kafka, TimescaleDB, топики, миграции, засев истории и все сервисы
 pnpm stack:down       # снести стенд
 ```
