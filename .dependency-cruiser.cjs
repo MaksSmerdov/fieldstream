@@ -15,6 +15,15 @@ module.exports = {
       to: { path: 'node_modules/(kafkajs|pg|drizzle-orm|@nestjs)' },
     },
     {
+      name: 'scenarios-through-ports',
+      comment: 'сценарии не знают про сеть, HTTP, базу и брокер: всё внешнее приходит через порты',
+      severity: 'error',
+      from: { path: '^packages/scenarios' },
+      to: {
+        path: 'node_modules/(kafkajs|pg|drizzle-orm|@nestjs|fastify|undici|axios|ws|modbus-serial)|^packages/(db|kafka|nest-common)|^services/|^(node:)?(http|https|http2|net|tls|dgram)$',
+      },
+    },
+    {
       name: 'no-service-to-service',
       comment: 'сервис никогда не импортирует другой сервис',
       severity: 'error',

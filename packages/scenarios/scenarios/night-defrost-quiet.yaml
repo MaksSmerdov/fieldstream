@@ -1,0 +1,16 @@
+name: night-defrost-quiet
+title: Тихая ночная оттайка
+description: >-
+  Все холодильные контроллеры уходят в оттайку. Испаритель греется выше нуля, и в режиме
+  охлаждения это был бы аларм, но в оттайке действуют свои уставки, поэтому алармы по
+  evap_temp_c не поднимаются. Оттайку не отменить, она идёт около 15 минут: сценарий, запущенный
+  сразу после, застанет камеры в оттайке.
+timeoutSec: 360
+steps:
+  - simScenario: night-defrost
+  - waitFor:
+      probe: { device: { deviceCode: RC-101, mode: defrost } }
+      timeoutSec: 30
+  - hold:
+      probe: { noAlarmsRaised: { metricKey: evap_temp_c } }
+      forSec: 300

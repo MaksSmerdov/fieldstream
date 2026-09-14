@@ -1,0 +1,27 @@
+name: dead-device
+title: Мёртвый прибор
+description: >-
+  Контроллер RC-105 на линии L2 перестаёт отвечать. После двух отказов размыкатель отсекает его,
+  и соседи по линии опрашиваются в прежнем темпе: обход не растягивается на таймаут мёртвого
+  прибора. Поломка снимается до того, как прибор уйдёт в «не на связи», поэтому первая же проба
+  размыкателя возвращает его. Уход в «не на связи» по отказам показывают обрыв линии и отказ шлюза.
+timeoutSec: 360
+steps:
+  - baseline: { line: L2, samples: 3, as: l2-cycle }
+  - inject: { targetKind: device, targetId: RC-105, kind: silent, ttlSec: 360 }
+  - waitFor:
+      probe: { breaker: { deviceCode: RC-105, state: open } }
+      timeoutSec: 45
+  - waitFor:
+      probe: { device: { deviceCode: RC-104, status: online } }
+      timeoutSec: 30
+  - waitFor:
+      probe: { line: { lineCode: L2, durationWithinPct: { of: l2-cycle, pct: 15 } } }
+      timeoutSec: 30
+  - clear: { targetId: RC-105, kind: silent }
+  - waitFor:
+      probe: { breaker: { deviceCode: RC-105, state: closed } }
+      timeoutSec: 120
+  - waitFor:
+      probe: { device: { deviceCode: RC-105, status: online } }
+      timeoutSec: 60
