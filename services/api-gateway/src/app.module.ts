@@ -14,9 +14,14 @@ import { KafkaBridgeService } from './events/kafka-bridge.service.js';
 import { LiveBusService } from './events/live-bus.service.js';
 import { HealthController } from './http/health.controller.js';
 import { MetricsController } from './http/metrics.controller.js';
+import { LabController } from './lab/lab.controller.js';
+import { LineStatusService } from './lab/line-status.service.js';
+import { SimClientService } from './lab/sim-client.service.js';
 import type { GatewayMetrics } from './metrics/metrics.js';
 import { CommandsController } from './commands/commands.controller.js';
 import { OutboxRelayService } from './commands/outbox-relay.service.js';
+import { PipelineController } from './pipeline/pipeline.controller.js';
+import { PipelineSamplerService } from './pipeline/pipeline-sampler.service.js';
 import { ProducerService } from './publish/producer.service.js';
 import { AlarmsController } from './read/alarms.controller.js';
 import { BootController } from './read/boot.controller.js';
@@ -51,6 +56,8 @@ export class AppModule {
         AlarmsController,
         CommandsController,
         BootController,
+        PipelineController,
+        LabController,
       ],
       providers: [
         { provide: ENV, useValue: deps.env },
@@ -66,6 +73,9 @@ export class AppModule {
         ProducerService,
         OutboxRelayService,
         DeviceRefsService,
+        PipelineSamplerService,
+        LineStatusService,
+        SimClientService,
       ],
     };
   }

@@ -56,6 +56,10 @@ const envSchema = z.object({
   /** Срок жизни команды: применять её позже смысла нет, обстановка уже другая. */
   COMMAND_TTL_MS: z.coerce.number().int().min(5_000).max(3_600_000).default(60_000),
   SSE_RING_SIZE: z.coerce.number().int().min(100).max(50_000).default(5_000),
+  PIPELINE_SAMPLER: z.enum(['on', 'off']).default('on'),
+  PIPELINE_POLL_MS: z.coerce.number().int().min(500).max(60_000).default(2_000),
+  COLLECTOR_STATUS: z.enum(['on', 'off']).default('on'),
+  SIM_URL: z.string().url().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

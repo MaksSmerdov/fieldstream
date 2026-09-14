@@ -37,6 +37,8 @@ beforeAll(async () => {
       SSE_PING_MS: '1000',
       AUTH_SECRET: SECRET,
       SSE_BRIDGE: 'off',
+      PIPELINE_SAMPLER: 'off',
+      COLLECTOR_STATUS: 'off',
     }),
     log: createLogger('api-gateway', 'fatal'),
     clock,

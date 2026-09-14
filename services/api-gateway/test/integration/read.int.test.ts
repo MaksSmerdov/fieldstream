@@ -151,7 +151,13 @@ beforeAll(async () => {
 
   pool = new pg.Pool({ connectionString: connectionUrl(target, ROLES.api, PASSWORDS.api), max: 4 });
   app = await createApp({
-    env: loadEnv({ FS_API_PASSWORD: PASSWORDS.api, AUTH_SECRET: SECRET, SSE_BRIDGE: 'off' }),
+    env: loadEnv({
+      FS_API_PASSWORD: PASSWORDS.api,
+      AUTH_SECRET: SECRET,
+      SSE_BRIDGE: 'off',
+      PIPELINE_SAMPLER: 'off',
+      COLLECTOR_STATUS: 'off',
+    }),
     log: createLogger('api-gateway', 'fatal'),
     clock,
     metrics: createMetrics(),

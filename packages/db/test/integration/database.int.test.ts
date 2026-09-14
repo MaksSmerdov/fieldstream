@@ -14,6 +14,7 @@ import type { ConnectionTarget } from '../../src/setup/connection.js';
 import { MIGRATIONS_DIR, runMigrations } from '../../src/setup/migrate.js';
 import { ROLES, bootstrapDatabase } from '../../src/setup/roles.js';
 import { loadAlarmRules, syncAlarmRules } from '../../src/store/alarms.js';
+import { loadDlqCounts } from '../../src/store/dlq.js';
 import { loadDeviceRefs, syncTopology } from '../../src/store/topology.js';
 import { insertPollCycles, insertReadings } from '../../src/store/writer.js';
 import type { ReadingRow } from '../../src/store/writer.js';
@@ -128,6 +129,23 @@ describe('схема базы на настоящей TimescaleDB', () => {
         `INSERT INTO ts.readings (ts, device_id, metric_key, value) VALUES (now(), 1, 'x', 1)`,
       ),
     ).rejects.toThrow(/permission denied/);
+  });
+
+  it('роль интерфейса считает очередь недоставленных: неразобранные отдельно от всех', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const before = await loadDlqCounts(api);
+
+    await ingest.query(
+      `INSERT INTO core.dlq_message (source_topic, partition, "offset", error, resolved_at)
+       VALUES ('dlq-count', 0, 1, '{}', NULL), ('dlq-count', 0, 2, '{}', NULL),
+              ('dlq-count', 0, 3, '{}', now())`,
+    );
+
+    expect(await loadDlqCounts(api)).toEqual({
+      unresolved: before.unresolved + 2,
+      total: before.total + 3,
+    });
   });
 
   it('стартовые уставки заводятся на все приборы, а правка оператора переносом не затирается', async () => {

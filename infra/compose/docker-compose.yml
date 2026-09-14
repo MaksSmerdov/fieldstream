@@ -164,6 +164,7 @@ services:
       KAFKA_BROKERS: kafka:9092
       DATABASE_HOST: timescaledb
       TRUST_PROXY: 'on'
+      SIM_URL: http://device-sim:8090
     depends_on:
       kafka-init:
         condition: service_completed_successfully

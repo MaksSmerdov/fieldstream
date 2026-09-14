@@ -15,6 +15,10 @@ export const MODULES = [
   'alarm-rules.edit',
   'commands.send',
   'pipeline',
+  'pipeline.control',
+  'lab',
+  'lab.inject',
+  'scenarios.run',
   'replay.run',
   'users.manage',
 ] as const;
@@ -25,12 +29,15 @@ export type ModuleId = z.infer<typeof moduleIdSchema>;
 export const permissionEffectSchema = z.enum(['grant', 'deny']);
 export type PermissionEffect = z.infer<typeof permissionEffectSchema>;
 
-const VIEWER: readonly ModuleId[] = ['overview', 'devices', 'alarms', 'pipeline'];
+const VIEWER: readonly ModuleId[] = ['overview', 'devices', 'alarms', 'pipeline', 'lab'];
 const ENGINEER: readonly ModuleId[] = [
   ...VIEWER,
   'alarms.ack',
   'alarm-rules.edit',
   'commands.send',
+  'pipeline.control',
+  'lab.inject',
+  'scenarios.run',
   'replay.run',
 ];
 
