@@ -1,0 +1,18 @@
+.lab {
+  &__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+
+    @media (min-width: 1100px) {
+      grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+    }
+  }
+
+  &__instruments {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+  }
+}

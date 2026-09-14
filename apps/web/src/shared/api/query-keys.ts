@@ -25,4 +25,7 @@ export const queryKeys = {
       params.device ?? 'all',
       params.limit ?? 50,
     ] as const,
+  pipeline: ['pipeline'] as const,
+  labLines: ['lab', 'lines'] as const,
+  labFaults: ['lab', 'faults'] as const,
 };

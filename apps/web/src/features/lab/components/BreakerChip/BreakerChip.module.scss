@@ -1,0 +1,53 @@
+.breaker {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 56px;
+
+  &__ring {
+    display: block;
+    width: 40px;
+    height: 40px;
+  }
+
+  &__track {
+    fill: none;
+    stroke: var(--mui-palette-divider);
+    stroke-width: 4;
+  }
+
+  &__arc {
+    fill: none;
+    stroke: var(--mui-palette-warning-main);
+    stroke-width: 4;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear;
+  }
+
+  &__body {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    align-items: center;
+  }
+
+  &__chip {
+    min-width: 88px;
+  }
+
+  &__failures {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__probe {
+    font-variant-numeric: tabular-nums;
+  }
+}

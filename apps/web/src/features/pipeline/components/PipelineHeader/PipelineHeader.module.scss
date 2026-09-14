@@ -1,0 +1,29 @@
+.header {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  &__title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    min-height: 40px;
+  }
+
+  &__age {
+    min-width: 180px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__broker {
+    overflow-wrap: anywhere;
+  }
+
+  &__reason {
+    display: block;
+    margin-bottom: 4px;
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-size: 0.8rem;
+  }
+}

@@ -1,0 +1,77 @@
+.map {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+
+  &__heading {
+    margin-bottom: 8px;
+  }
+
+  &__scroll {
+    overflow-x: auto;
+    border-radius: 8px;
+
+    &:focus-visible {
+      outline: 2px solid var(--mui-palette-primary-main);
+      outline-offset: 2px;
+    }
+  }
+
+  &__svg {
+    display: block;
+    width: 100%;
+    min-width: 1080px;
+    height: auto;
+  }
+
+  &__edge {
+    fill: none;
+    stroke: var(--mui-palette-text-secondary);
+    stroke-width: 1.5;
+  }
+
+  &__arrow {
+    fill: var(--mui-palette-text-secondary);
+  }
+
+  &__rate {
+    fill: var(--mui-palette-text-primary);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    paint-order: stroke;
+    stroke: var(--mui-palette-background-paper);
+    stroke-width: 4px;
+  }
+
+  &__node {
+    fill: var(--mui-palette-background-paper);
+    stroke: var(--mui-palette-divider);
+    stroke-width: 1.5;
+  }
+
+  &__node_warn {
+    stroke: var(--mui-palette-warning-main);
+    stroke-width: 2.5;
+  }
+
+  &__title {
+    fill: var(--mui-palette-text-primary);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__line {
+    fill: var(--mui-palette-text-secondary);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__badge {
+    fill: var(--mui-palette-warning-main);
+  }
+
+  &__mark {
+    fill: var(--mui-palette-background-paper);
+    font-size: 12px;
+    font-weight: 700;
+  }
+}
