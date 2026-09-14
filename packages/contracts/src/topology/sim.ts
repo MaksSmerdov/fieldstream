@@ -95,6 +95,18 @@ export const simFaultSchema = z
   .strict();
 export type SimFault = z.infer<typeof simFaultSchema>;
 
+/** Выборочное снятие поломок: без фильтров снимаются все. */
+export const simClearFaultsQuerySchema = z
+  .object({
+    targetId: z.union([lineCodeSchema, deviceCodeSchema]).optional(),
+    kind: simFaultKindSchema.optional(),
+  })
+  .strict();
+export type SimClearFaultsQuery = z.infer<typeof simClearFaultsQuerySchema>;
+
+export const simClearFaultsResultSchema = z.object({ removed: z.number().int().min(0) }).strict();
+export type SimClearFaultsResult = z.infer<typeof simClearFaultsResultSchema>;
+
 export const simScenarioNameSchema = z.enum([
   'night-defrost',
   'power-dip',

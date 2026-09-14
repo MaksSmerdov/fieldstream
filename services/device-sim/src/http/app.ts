@@ -2,10 +2,12 @@ import { LogController, fastify } from 'fastify';
 import type { FastifyInstance, FastifyReply, FastifyServerOptions } from 'fastify';
 import type { ZodError } from 'zod';
 import {
+  simClearFaultsQuerySchema,
   simFaultRequestSchema,
   simScenarioNameSchema,
   simSpeedRequestSchema,
 } from '@fieldstream/contracts';
+import type { SimClearFaultsResult } from '@fieldstream/contracts';
 import type { FaultResult, Simulator } from '../simulator.js';
 
 interface ProblemIssue {
@@ -92,10 +94,22 @@ export const buildHttpApp = (
     return faultResponse(reply, result);
   });
 
-  app.delete('/sim/faults', (_request, reply) => {
-    const removed = sim.clearFaults();
-    app.log.info({ removed }, 'поломки сняты');
-    void reply.code(204).send();
+  app.delete('/sim/faults', (request, reply) => {
+    const parsed = simClearFaultsQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return problem(
+        reply,
+        400,
+        'Неверный запрос',
+        'фильтр снятия поломок не прошёл проверку',
+        issuesOf(parsed.error),
+      );
+    }
+
+    const removed = sim.clearFaults(parsed.data);
+    app.log.info({ removed, filter: parsed.data }, 'поломки сняты');
+    const result: SimClearFaultsResult = { removed };
+    return result;
   });
 
   app.post<{ Params: { name: string } }>('/sim/scenario/:name', (request, reply) => {

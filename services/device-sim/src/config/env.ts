@@ -8,6 +8,7 @@ const envSchema = z.object({
   SIM_HTTP_PORT: port.default(8090),
   SIM_SPEED: z.coerce.number().min(1).max(60).default(1),
   SIM_TURNAROUND_MS: z.coerce.number().int().min(0).max(1000).default(5),
+  SIM_TURNAROUND_JITTER_MS: z.coerce.number().int().min(0).max(1000).default(40),
   SIM_BUS_TIMEOUT_MS: z.coerce.number().int().min(0).max(10_000).default(500),
   SIM_STALL_MS: z.coerce.number().int().min(0).max(60_000).default(5000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),

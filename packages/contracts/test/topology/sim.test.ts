@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { simFaultRequestSchema, simSpeedRequestSchema } from '../../src/topology/sim.js';
+import {
+  simClearFaultsQuerySchema,
+  simClearFaultsResultSchema,
+  simFaultRequestSchema,
+  simSpeedRequestSchema,
+} from '../../src/topology/sim.js';
 
 /** Сообщения ошибок разбора: по ним видно, какое правило сработало. */
 const messagesOf = (input: unknown): string[] => {
@@ -58,6 +63,44 @@ describe('simFaultRequestSchema', () => {
         extra: true,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('simClearFaultsQuerySchema', () => {
+  const accepts = (input: unknown): boolean => simClearFaultsQuerySchema.safeParse(input).success;
+
+  it('без фильтров запрос допустим: снимаются все поломки', () => {
+    expect(simClearFaultsQuerySchema.parse({})).toEqual({});
+  });
+
+  it('цель задаётся кодом линии или прибора', () => {
+    expect(accepts({ targetId: 'L1' })).toBe(true);
+    expect(accepts({ targetId: 'RC-101' })).toBe(true);
+    expect(accepts({ targetId: 'RC-1' })).toBe(false);
+    expect(accepts({ targetId: '' })).toBe(false);
+  });
+
+  it('вид поломки берётся из списка и сочетается с целью', () => {
+    expect(accepts({ kind: 'silent' })).toBe(true);
+    expect(accepts({ targetId: 'RC-101', kind: 'stall' })).toBe(true);
+    expect(accepts({ kind: 'meteor' })).toBe(false);
+  });
+
+  it('лишние параметры отвергаются', () => {
+    expect(accepts({ lineCode: 'L1' })).toBe(false);
+  });
+});
+
+describe('simClearFaultsResultSchema', () => {
+  it('число снятых поломок целое и неотрицательное', () => {
+    const accepts = (input: unknown): boolean =>
+      simClearFaultsResultSchema.safeParse(input).success;
+
+    expect(accepts({ removed: 0 })).toBe(true);
+    expect(accepts({ removed: 3 })).toBe(true);
+    expect(accepts({ removed: -1 })).toBe(false);
+    expect(accepts({ removed: 1.5 })).toBe(false);
+    expect(accepts({ removed: 1, extra: true })).toBe(false);
   });
 });
 

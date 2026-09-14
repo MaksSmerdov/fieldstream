@@ -2,6 +2,7 @@ import { simFaultRequestSchema } from '@fieldstream/contracts';
 import type {
   DeviceProfile,
   ParamSpec,
+  SimClearFaultsQuery,
   SimFault,
   SimFaultRequest,
   SimScenarioName,
@@ -44,7 +45,7 @@ export interface Simulator {
   readonly answer: (lineCode: string, request: ModbusRequest) => Answer;
   readonly isLineOnline: (lineCode: string) => boolean;
   readonly applyFault: (request: SimFaultRequest) => FaultResult;
-  readonly clearFaults: () => number;
+  readonly clearFaults: (filter?: SimClearFaultsQuery) => number;
   readonly runScenario: (name: SimScenarioName) => FaultResult[];
   readonly setSpeed: (factor: number) => void;
   readonly state: () => SimState;
@@ -267,7 +268,7 @@ export const createSimulator = (options: SimulatorOptions): Simulator => {
     answer,
     isLineOnline,
     applyFault,
-    clearFaults: () => book.clear(),
+    clearFaults: (filter) => book.clear(filter),
     runScenario: (name) =>
       SCENARIOS[name](stand).map((input) => {
         const parsed = simFaultRequestSchema.safeParse(input);
