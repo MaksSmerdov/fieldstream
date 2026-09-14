@@ -51,6 +51,38 @@ const SAMPLES: { readonly [K in TopicKey]: PayloadOf<K> } = {
     planMode: 'merged',
     traceId: TRACE_ID,
   },
+  lineStatus: {
+    schema: 'line.status',
+    v: 1,
+    ts: TS,
+    lineCode: 'L1',
+    running: true,
+    connected: true,
+    planMode: 'merged',
+    pollIntervalMs: 10_000,
+    requestTimeoutMs: 600,
+    hardTimeoutMs: 1_450,
+    watchdog: { limitMs: 300_000, cycleStartedAt: TS, trips: 0 },
+    lastCycle: { at: TS, outcome: 'polled', durationMs: 420, polled: 6, failed: 1 },
+    reconnects: [{ attempt: 0, at: TS, baseMs: 1_000, jitterMs: -40, chosenMs: 960 }],
+    devices: [
+      {
+        deviceCode: 'RC-105',
+        slaveId: 5,
+        breaker: { state: 'open', failures: 2, probeDelayMs: 30_000, nextProbeAt: TS },
+      },
+    ],
+    latency: {
+      bucketsMs: [50, 100, 200],
+      counts: [10, 30, 2, 0],
+      samples: 42,
+      timeouts: 3,
+      p50Ms: 64,
+      p95Ms: 140,
+      p99Ms: 180,
+      suggestedTimeoutMs: 900,
+    },
+  },
   telemetryReadings: {
     schema: 'telemetry.reading',
     v: 1,
@@ -185,6 +217,13 @@ describe('манифест топиков', () => {
   it('пример payload проходит схему своего топика', () => {
     expect(TOPICS.telemetryRaw.schema.safeParse(SAMPLES.telemetryRaw).success).toBe(true);
     expect(TOPICS.pollCycles.schema.safeParse(SAMPLES.pollCycles).success).toBe(true);
+    expect(TOPICS.lineStatus.schema.safeParse(SAMPLES.lineStatus).success).toBe(true);
+    expect(
+      TOPICS.lineStatus.schema.safeParse({
+        ...SAMPLES.lineStatus,
+        latency: { ...SAMPLES.lineStatus.latency, counts: [10, 30, 2] },
+      }).success,
+    ).toBe(false);
     expect(TOPICS.telemetryReadings.schema.safeParse(SAMPLES.telemetryReadings).success).toBe(true);
     expect(TOPICS.deviceState.schema.safeParse(SAMPLES.deviceState).success).toBe(true);
     expect(TOPICS.alarmEvents.schema.safeParse(SAMPLES.alarmEvents).success).toBe(true);

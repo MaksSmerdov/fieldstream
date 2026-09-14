@@ -4,6 +4,7 @@ export * from './messages/telemetry.js';
 export * from './messages/health.js';
 export * from './messages/alarms.js';
 export * from './messages/commands.js';
+export * from './messages/collector.js';
 export * from './messages/events.js';
 export * from './kafka/topics.manifest.js';
 export * from './series.js';

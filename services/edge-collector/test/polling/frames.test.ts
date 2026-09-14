@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { pollCycleSchema, telemetryRawSchema } from '@fieldstream/contracts';
+import { lineStatusSchema, pollCycleSchema, telemetryRawSchema } from '@fieldstream/contracts';
 import { DEMO_STAND, rc2000Profile } from '@fieldstream/device-profiles';
-import { buildPollCycle, buildRawFrame, newTraceId } from '../../src/polling/frames.js';
+import {
+  buildLineStatus,
+  buildPollCycle,
+  buildRawFrame,
+  newTraceId,
+} from '../../src/polling/frames.js';
 import type { DeviceContext } from '../../src/polling/frames.js';
+import { summarizeLatency } from '../../src/polling/latency.js';
 
 const device = DEMO_STAND.devices.find((candidate) => candidate.code === 'RC-104');
 if (device === undefined) throw new Error('на стенде нет RC-104');
@@ -67,6 +73,56 @@ describe('сообщения сборщика', () => {
 
     expect(pollCycleSchema.safeParse(cycle).success).toBe(true);
     expect('backoff' in cycle).toBe(false);
+  });
+
+  it('снимок линии проходит схему топика, наступившая проба видна как half_open', () => {
+    const status = buildLineStatus(
+      {
+        lineCode: 'L2',
+        running: true,
+        connected: false,
+        planMode: 'merged',
+        pollIntervalMs: 10_000,
+        requestTimeoutMs: 600,
+        cycleStartedAt: AT,
+        watchdogLimitMs: 300_000,
+        watchdogTrips: 1,
+        lastCycle: {
+          at: '2026-09-11T09:59:50.000Z',
+          outcome: 'watchdog',
+          durationMs: 300_000.4,
+          polled: 0,
+          failed: 0,
+        },
+        reconnects: [
+          {
+            attempt: 0,
+            at: '2026-09-11T09:59:59.000Z',
+            baseMs: 1_000,
+            jitterMs: -40,
+            chosenMs: 960,
+          },
+        ],
+        devices: [
+          { device, breaker: { failures: 2, open: true, probeDelayMs: 30_000, nextProbeAt: AT } },
+        ],
+        latency: summarizeLatency([{ kind: 'ok', durationMs: 42 }, { kind: 'timeout' }]),
+      },
+      AT,
+    );
+
+    expect(lineStatusSchema.parse(status)).toEqual(status);
+    expect(status).toMatchObject({
+      hardTimeoutMs: 1_450,
+      watchdog: { limitMs: 300_000, cycleStartedAt: '2026-09-11T10:00:00.000Z', trips: 1 },
+      lastCycle: { durationMs: 300_000 },
+    });
+    expect(status.devices[0]?.breaker).toEqual({
+      state: 'half_open',
+      failures: 2,
+      probeDelayMs: 30_000,
+      nextProbeAt: '2026-09-11T10:00:00.000Z',
+    });
   });
 
   it('идентификатор обхода: 16 шестнадцатеричных знаков, каждый раз новый', () => {

@@ -14,6 +14,8 @@ export interface DevicePoll {
   readonly error: unknown;
   readonly requestCount: number;
   readonly durationMs: number;
+  readonly requestDurationsMs: readonly number[];
+  readonly timedOut: boolean;
 }
 
 /**
@@ -28,21 +30,27 @@ export const pollDevice = async (
 ): Promise<DevicePoll> => {
   const startedAt = clock.now();
   const blocks: RawBlock[] = [];
+  const requestDurationsMs: number[] = [];
   let requestCount = 0;
 
   for (const block of plan.blocks) {
     requestCount += 1;
+    const requestStartedAt = clock.now();
     try {
       const words = await read(slaveId, block);
+      requestDurationsMs.push(clock.now() - requestStartedAt);
       blocks.push({ registerType: block.registerType, startAddress: block.startAddress, words });
     } catch (error) {
+      const errorKind = classifyError(error);
       return {
         ok: false,
         blocks,
-        errorKind: classifyError(error),
+        errorKind,
         error,
         requestCount,
         durationMs: clock.now() - startedAt,
+        requestDurationsMs,
+        timedOut: errorKind === 'timeout' || errorKind === 'stalled',
       };
     }
   }
@@ -54,5 +62,7 @@ export const pollDevice = async (
     error: null,
     requestCount,
     durationMs: clock.now() - startedAt,
+    requestDurationsMs,
+    timedOut: false,
   };
 };

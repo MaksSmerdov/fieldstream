@@ -2,15 +2,20 @@ import { randomBytes } from 'node:crypto';
 import type {
   DeviceProfile,
   ErrorKind,
+  LatencyWindow,
+  LineStatus,
   PollCycle,
   RawBlock,
+  ReconnectStep,
   StandDevice,
   TelemetryRaw,
 } from '@fieldstream/contracts';
 import type { PlanMode } from '@fieldstream/device-profiles';
 import { toIsoTimestamp } from '@fieldstream/domain';
-import type { BreakerView } from '../breaker/breaker.js';
+import { breakerView } from '../breaker/breaker.js';
+import type { Breaker, BreakerView } from '../breaker/breaker.js';
 import type { BackoffStep } from '../transport/backoff.js';
+import { hardTimeoutMs } from '../transport/timeouts.js';
 
 /** Где стоит прибор: всё, что едет в кадр вместе с его регистрами. */
 export interface DeviceContext {
@@ -30,6 +35,22 @@ export interface CycleFacts {
   readonly planMode: PlanMode;
   readonly backoff?: BackoffStep;
   readonly breaker?: { readonly state: BreakerView; readonly nextProbeAt: number | null };
+}
+
+export interface LineStatusFacts {
+  readonly lineCode: string;
+  readonly running: boolean;
+  readonly connected: boolean;
+  readonly planMode: PlanMode;
+  readonly pollIntervalMs: number;
+  readonly requestTimeoutMs: number;
+  readonly cycleStartedAt: number | null;
+  readonly watchdogLimitMs: number;
+  readonly watchdogTrips: number;
+  readonly lastCycle: LineStatus['lastCycle'];
+  readonly reconnects: readonly ReconnectStep[];
+  readonly devices: readonly { readonly device: StandDevice; readonly breaker: Breaker }[];
+  readonly latency: LatencyWindow;
 }
 
 /** Сквозной идентификатор обхода: рождается на цикле опроса и едет дальше через все сервисы. */
@@ -86,4 +107,39 @@ export const buildPollCycle = (
         },
       }),
   traceId,
+});
+
+/** Снимок линии: размыкатели считаются на момент atMs, поэтому наступившая проба видна как half_open. */
+export const buildLineStatus = (facts: LineStatusFacts, atMs: number): LineStatus => ({
+  schema: 'line.status',
+  v: 1,
+  ts: toIsoTimestamp(atMs),
+  lineCode: facts.lineCode,
+  running: facts.running,
+  connected: facts.connected,
+  planMode: facts.planMode,
+  pollIntervalMs: facts.pollIntervalMs,
+  requestTimeoutMs: facts.requestTimeoutMs,
+  hardTimeoutMs: hardTimeoutMs(facts.requestTimeoutMs),
+  watchdog: {
+    limitMs: facts.watchdogLimitMs,
+    cycleStartedAt: facts.cycleStartedAt === null ? null : toIsoTimestamp(facts.cycleStartedAt),
+    trips: facts.watchdogTrips,
+  },
+  lastCycle:
+    facts.lastCycle === null
+      ? null
+      : { ...facts.lastCycle, durationMs: Math.max(0, Math.round(facts.lastCycle.durationMs)) },
+  reconnects: facts.reconnects.map((step) => ({ ...step })),
+  devices: facts.devices.map(({ device, breaker }) => ({
+    deviceCode: device.code,
+    slaveId: device.slaveId,
+    breaker: {
+      state: breakerView(breaker, atMs),
+      failures: breaker.failures,
+      probeDelayMs: breaker.probeDelayMs,
+      nextProbeAt: breaker.nextProbeAt === null ? null : toIsoTimestamp(breaker.nextProbeAt),
+    },
+  })),
+  latency: facts.latency,
 });

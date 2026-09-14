@@ -8,6 +8,7 @@ import type { Clock } from '@fieldstream/domain';
 import type { Env } from '../config/env.js';
 import type { Logger } from '@fieldstream/nest-common';
 import type { CollectorMetrics } from '../metrics/metrics.js';
+import { newTraceId } from '../polling/frames.js';
 import { createLineWorker } from '../polling/line-worker.js';
 import type { LineSnapshot, LineWorker } from '../polling/line-worker.js';
 import { KafkaPublisher } from '../publish/kafka-publisher.js';
@@ -57,16 +58,25 @@ export class LinesService implements OnApplicationBootstrap, BeforeApplicationSh
         publishCycle: (cycle) => {
           publisher.publish(TOPICS.pollCycles, cycle, cycle.traceId);
         },
+        publishStatus: (status) => {
+          publisher.publish(TOPICS.lineStatus, status, newTraceId());
+        },
         onPoll: (errorKind) => {
           metrics.observePoll(line.code, errorKind);
         },
+        onRequest: (durationMs) => {
+          metrics.observeRequest(line.code, durationMs);
+        },
         onCycle: (report, openBreakers) => {
-          metrics.observeCycle(line.code, report.durationMs);
+          if (report.outcome !== 'idle') metrics.observeCycle(line.code, report.durationMs);
           metrics.setOpenBreakers(line.code, openBreakers);
           metrics.setBuffer(publisher.bufferSize());
         },
         onReconnect: () => {
           metrics.observeReconnect(line.code);
+        },
+        onWatchdogTrip: () => {
+          metrics.observeWatchdogTrip(line.code);
         },
       });
     });

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { telemetryRawSchema, telemetryReadingSchema } from '../messages/telemetry.js';
 import { alarmEventSchema } from '../messages/alarms.js';
 import { commandResultSchema, deviceCommandSchema } from '../messages/commands.js';
+import { lineStatusSchema } from '../messages/collector.js';
 import { deviceStateSchema, pollCycleSchema } from '../messages/events.js';
 
 /**
@@ -54,6 +55,19 @@ export const TOPICS = {
     retentionMs: 3 * DAY_MS,
     owner: 'edge-collector',
     why: 'Пишется даже когда прибор не ответил и кадра нет: иначе отказ невидим.',
+  }),
+  lineStatus: define({
+    name: 'fieldstream.collector.status.v1',
+    schema: lineStatusSchema,
+    keyOf: (p) => p.lineCode,
+    partitions: 3,
+    cleanupPolicy: 'compact',
+    retentionMs: null,
+    configs: { 'segment.ms': '60000', 'min.cleanable.dirty.ratio': '0.1' },
+    owner: 'edge-collector',
+    why:
+      'Снимок линии: размыкатели, лестница переподключения, сторож цикла и время ответа. ' +
+      'Сборщик стоит за NAT, поэтому его состояние едет топиком, а компакция хранит последний снимок линии.',
   }),
   telemetryReadings: define({
     name: 'fieldstream.telemetry.readings.v1',
