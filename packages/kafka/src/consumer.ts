@@ -15,9 +15,12 @@ export const CONSUMER_CONFIG: Omit<ConsumerConfig, 'groupId'> = Object.freeze({
   retry: { retries: 5, initialRetryTime: 300, maxRetryTime: 30_000 },
 });
 
-/** Потребитель группы с настройками проекта. */
-export const createConsumer = (kafka: Kafka, groupId: string): Consumer =>
-  kafka.consumer({ ...CONSUMER_CONFIG, groupId });
+/** Потребитель группы с настройками проекта. Переопределение нужно, например, для своего назначателя партиций. */
+export const createConsumer = (
+  kafka: Kafka,
+  groupId: string,
+  overrides: Partial<Omit<ConsumerConfig, 'groupId'>> = {},
+): Consumer => kafka.consumer({ ...CONSUMER_CONFIG, ...overrides, groupId });
 
 /**
  * Подтверждение пачки по offset включительно. При autoCommit: false вызов

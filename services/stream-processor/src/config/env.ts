@@ -15,6 +15,7 @@ const list = z
 const envSchema = z.object({
   KAFKA_BROKERS: list.default('localhost:29092'),
   KAFKA_CLIENT_ID: z.string().min(1).default('stream-processor'),
+  PROCESSOR_INSTANCE_ID: z.string().min(1).optional(),
   DATABASE_HOST: z.string().min(1).default('localhost'),
   DATABASE_PORT: port.default(5432),
   POSTGRES_DB: z.string().min(1).default('fieldstream'),

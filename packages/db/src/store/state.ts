@@ -1,5 +1,11 @@
 import type pg from 'pg';
-import type { DeviceEvent, DeviceState } from '@fieldstream/contracts';
+import type {
+  DeviceEvent,
+  DeviceMode,
+  DeviceState,
+  HealthReason,
+  HealthStatus,
+} from '@fieldstream/contracts';
 
 export interface DeviceStateRow {
   readonly deviceId: number;
@@ -23,6 +29,8 @@ export interface DlqRow {
   readonly error: string;
 }
 
+const HANDOVER_LOCK = 'fieldstream.device-state.handover';
+
 /** Работа в одной транзакции на отдельном соединении пула. Сломанное соединение в пул не возвращается. */
 export const withTransaction = async <T>(
   pool: pg.Pool,
@@ -43,6 +51,27 @@ export const withTransaction = async <T>(
   } finally {
     client.release(broken);
   }
+};
+
+/**
+ * Блокировка переезда состояния приборов до конца текущей транзакции. Проверка здоровья пишет
+ * под общей блокировкой, а новый владелец читает под исключительной, поэтому чтение не проскочит
+ * мимо записи, которую прежний владелец уже начал. timeoutMs ограничивает ожидание в базе.
+ */
+export const lockDeviceStateHandover = async (
+  client: pg.ClientBase,
+  mode: 'publish' | 'adopt',
+  timeoutMs?: number,
+): Promise<void> => {
+  if (timeoutMs !== undefined) {
+    await client.query(`SELECT set_config('lock_timeout', $1, true)`, [`${String(timeoutMs)}ms`]);
+  }
+  await client.query(
+    mode === 'publish'
+      ? 'SELECT pg_advisory_xact_lock_shared(hashtext($1))'
+      : 'SELECT pg_advisory_xact_lock(hashtext($1))',
+    [HANDOVER_LOCK],
+  );
 };
 
 /** Последнее состояние приборов: одна строка на прибор, перезаписывается целиком. */
@@ -72,6 +101,46 @@ export const upsertDeviceStates = async (
       rows.map((row) => row.updatedAt),
     ],
   );
+};
+
+/**
+ * Последнее записанное состояние приборов по кодам. С него продолжает здоровье экземпляр,
+ * которому партиция прибора досталась при ребалансе. Прибор без строки в ответ не попадает.
+ */
+export const loadDeviceStates = async (
+  client: pg.ClientBase,
+  deviceCodes: readonly string[],
+): Promise<DeviceState[]> => {
+  if (deviceCodes.length === 0) return [];
+
+  const result = await client.query<{
+    device_code: string;
+    status: HealthStatus;
+    reason: HealthReason;
+    since: Date;
+    mode: DeviceMode;
+    last_ok_at: Date | null;
+    consecutive_errors: number;
+  }>(
+    `SELECT d.code AS device_code, s.status, s.reason, s.since, s.mode, s.last_ok_at,
+            s.consecutive_errors
+     FROM core.device_state s JOIN core.devices d ON d.id = s.device_id
+     WHERE d.code = ANY($1::text[])
+     ORDER BY d.code`,
+    [[...deviceCodes]],
+  );
+
+  return result.rows.map((row) => ({
+    schema: 'device.state',
+    v: 1,
+    deviceCode: row.device_code,
+    status: row.status,
+    reason: row.reason,
+    since: row.since.toISOString(),
+    mode: row.mode,
+    lastOkAt: row.last_ok_at === null ? null : row.last_ok_at.toISOString(),
+    consecutiveErrors: row.consecutive_errors,
+  }));
 };
 
 /** События приборов. Повтор того же события ничего не добавляет: ключ (прибор, вид, момент). */

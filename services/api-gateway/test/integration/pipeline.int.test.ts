@@ -22,8 +22,8 @@ const KAFKA_IMAGE = 'apache/kafka:3.9.0';
 const SECRET = 'секрет стенда длиной не меньше тридцати двух символов';
 const TOPIC = TOPICS.pollCycles.name;
 const GROUP = 'pipeline-int-readers';
-const WRITTEN = [4, 8, 12];
-const COMMITTED = [2, 4, 6];
+const WRITTEN = [4, 8, 12, 16, 20, 24];
+const COMMITTED = [2, 4, 6, 8, 10, 12];
 
 const clock = createFakeClock(SystemClock.now());
 const client = {
@@ -81,7 +81,7 @@ const write = async (perPartition: readonly number[]): Promise<void> => {
     topic: TOPIC,
     messages: perPartition.flatMap((count, partition) =>
       Array.from({ length: count }, (_, index) => ({
-        key: `L${String(partition + 1)}`,
+        key: `RC-${String(101 + partition)}`,
         partition,
         value: JSON.stringify({ partition, index }),
       })),
@@ -262,6 +262,9 @@ describe('снимок конвейера на настоящем брокере
       { partition: 0, low: 0, high: 4 },
       { partition: 1, low: 0, high: 8 },
       { partition: 2, low: 0, high: 12 },
+      { partition: 3, low: 0, high: 16 },
+      { partition: 4, low: 0, high: 20 },
+      { partition: 5, low: 0, high: 24 },
     ]);
     expect(topicOf(response).messagesPerSec).toBeNull();
     expect(response.rebalances).toEqual([]);
@@ -270,31 +273,37 @@ describe('снимок конвейера на настоящем брокере
     const memberId = group.members[0]?.memberId;
     expect(group.state).toBe('Stable');
     expect(group.members).toHaveLength(1);
-    expect(group.members[0]?.assignments).toEqual([{ topic: TOPIC, partitions: [0, 1, 2] }]);
+    expect(group.members[0]?.assignments).toEqual([
+      { topic: TOPIC, partitions: [0, 1, 2, 3, 4, 5] },
+    ]);
     expect(group.lag).toEqual([
       { topic: TOPIC, partition: 0, committed: 2, high: 4, lag: 2, memberId },
       { topic: TOPIC, partition: 1, committed: 4, high: 8, lag: 4, memberId },
       { topic: TOPIC, partition: 2, committed: 6, high: 12, lag: 6, memberId },
+      { topic: TOPIC, partition: 3, committed: 8, high: 16, lag: 8, memberId },
+      { topic: TOPIC, partition: 4, committed: 10, high: 20, lag: 10, memberId },
+      { topic: TOPIC, partition: 5, committed: 12, high: 24, lag: 12, memberId },
     ]);
-    expect(group.totalLag).toBe(12);
+    expect(group.totalLag).toBe(42);
     expect(group.lagSeconds).toBeNull();
     expect(await lagMetric(2)).toBe(6);
   });
 
   it('после второго опроса у топика есть темп, а у группы оценка секунд', async () => {
-    await write([2, 2, 2]);
+    await write([2, 2, 2, 2, 2, 2]);
     clock.advance(2_000);
 
     const response = await snapshot();
     const group = groupOf(response);
 
-    expect(topicOf(response).messagesPerSec).toBe(3);
+    expect(topicOf(response).messagesPerSec).toBe(6);
     expect(
       response.topics.filter((topic) => topic.name !== TOPIC).map((topic) => topic.messagesPerSec),
     ).toEqual(Array.from({ length: response.topics.length - 1 }, () => 0));
-    expect(group.totalLag).toBe(18);
-    expect(group.lagSeconds).toBe(6);
+    expect(group.totalLag).toBe(54);
+    expect(group.lagSeconds).toBe(9);
     expect(await lagMetric(0)).toBe(4);
+    expect(await lagMetric(5)).toBe(14);
   });
 
   it('вход второго участника в группу виден как ребаланс с одного на двух', async () => {
@@ -315,7 +324,7 @@ describe('снимок конвейера на настоящем брокере
         ) &&
         group.state === 'Stable' &&
         group.members.length === 2 &&
-        assigned.length === 3
+        assigned.length === WRITTEN.length
       );
     });
 

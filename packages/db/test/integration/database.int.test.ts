@@ -13,8 +13,20 @@ import { connectionUrl } from '../../src/setup/connection.js';
 import type { ConnectionTarget } from '../../src/setup/connection.js';
 import { MIGRATIONS_DIR, runMigrations } from '../../src/setup/migrate.js';
 import { ROLES, bootstrapDatabase } from '../../src/setup/roles.js';
-import { loadAlarmRules, syncAlarmRules } from '../../src/store/alarms.js';
+import {
+  clearAlarmEvents,
+  insertAlarmEvents,
+  loadAlarmRules,
+  loadOpenAlarmEpisodes,
+  syncAlarmRules,
+} from '../../src/store/alarms.js';
+import type { AlarmEventRow } from '../../src/store/alarms.js';
 import { loadDlqCounts } from '../../src/store/dlq.js';
+import {
+  loadDeviceStates,
+  lockDeviceStateHandover,
+  upsertDeviceStates,
+} from '../../src/store/state.js';
 import { loadDeviceRefs, syncTopology } from '../../src/store/topology.js';
 import { insertPollCycles, insertReadings } from '../../src/store/writer.js';
 import type { ReadingRow } from '../../src/store/writer.js';
@@ -218,6 +230,117 @@ describe('схема базы на настоящей TimescaleDB', () => {
     await expect(
       ingest.query('UPDATE core.alarm_rules SET max_value = 0 WHERE device_id = $1', [id]),
     ).rejects.toThrow(/permission denied/);
+  });
+
+  it('последнее состояние читается только по перечисленным приборам', async () => {
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const updatedAt = new Date(await hoursAgo(ingest, 0)).toISOString();
+    const online = {
+      schema: 'device.state',
+      v: 1,
+      deviceCode: 'RC-110',
+      status: 'online',
+      reason: 'ok',
+      since: '2026-09-11T10:00:00.000Z',
+      mode: 'defrost',
+      lastOkAt: '2026-09-11T10:04:30.000Z',
+      consecutiveErrors: 1,
+    } as const;
+    const offline = {
+      ...online,
+      deviceCode: 'RC-111',
+      status: 'offline',
+      reason: 'consecutive_errors',
+      mode: 'cooling',
+      lastOkAt: null,
+      consecutiveErrors: 5,
+    } as const;
+
+    await upsertDeviceStates(ingest, [
+      { deviceId: await deviceId(ingest, 'RC-110'), state: online, updatedAt },
+      { deviceId: await deviceId(ingest, 'RC-111'), state: offline, updatedAt },
+    ]);
+
+    expect(await loadDeviceStates(ingest, ['RC-111', 'RC-110', 'RC-999'])).toEqual([
+      online,
+      offline,
+    ]);
+    expect(await loadDeviceStates(ingest, ['RC-111'])).toEqual([offline]);
+    expect(await loadDeviceStates(ingest, ['PM-212'])).toEqual([]);
+  });
+
+  it('новый владелец не читает состояние, пока прежний дописывает проверку здоровья', async () => {
+    const publisher = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const neighbour = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const adopter = await connect(ROLES.ingest, PASSWORDS.ingest);
+
+    await publisher.query('BEGIN');
+    await lockDeviceStateHandover(publisher, 'publish');
+
+    await neighbour.query('BEGIN');
+    await lockDeviceStateHandover(neighbour, 'publish', 200);
+    await neighbour.query('COMMIT');
+
+    await adopter.query('BEGIN');
+    await expect(lockDeviceStateHandover(adopter, 'adopt', 200)).rejects.toThrow(/lock timeout/);
+    await adopter.query('ROLLBACK');
+
+    await publisher.query('COMMIT');
+    await adopter.query('BEGIN');
+    await lockDeviceStateHandover(adopter, 'adopt', 200);
+    await adopter.query('COMMIT');
+  });
+
+  it('открытые эпизоды фильтруются по приборам, закрытые не попадают вовсе', async () => {
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const base = await hoursAgo(ingest, 2);
+    const episode = async (deviceCode: string, offsetMs: number): Promise<AlarmEventRow> => {
+      const occurredAt = new Date(base + offsetMs).toISOString();
+      return {
+        alarmId: crypto.randomUUID(),
+        deviceId: await deviceId(ingest, deviceCode),
+        metricKey: 'supply_temp_c',
+        mode: 'cooling',
+        severity: 'critical',
+        boundary: 'max',
+        value: 7.5,
+        threshold: 2,
+        occurredAt,
+        dedupeKey: `${deviceCode}|supply_temp_c|cooling|raised|${occurredAt}`,
+      };
+    };
+    const rows = [
+      await episode('RC-106', 0),
+      await episode('RC-107', 1_000),
+      await episode('RC-108', 2_000),
+    ];
+    await insertAlarmEvents(ingest, rows);
+    await clearAlarmEvents(ingest, [
+      {
+        dedupeKey: rows[1]?.dedupeKey ?? '',
+        clearedAt: new Date(base + 60_000).toISOString(),
+        clearedValue: 1,
+      },
+    ]);
+
+    const filtered = await loadOpenAlarmEpisodes(ingest, ['RC-106', 'RC-107']);
+    expect(filtered).toEqual([
+      {
+        deviceCode: 'RC-106',
+        metricKey: 'supply_temp_c',
+        mode: 'cooling',
+        boundary: 'max',
+        severity: 'critical',
+        threshold: 2,
+        raisedAtMs: base,
+      },
+    ]);
+    expect(await loadOpenAlarmEpisodes(ingest, [])).toEqual([]);
+
+    const everyone = (await loadOpenAlarmEpisodes(ingest)).map((item) => item.deviceCode);
+    expect(everyone).toContain('RC-106');
+    expect(everyone).toContain('RC-108');
+    expect(everyone).not.toContain('RC-107');
   });
 
   it('команду в очередь кладёт интерфейс, а факт применения пишет процессор', async () => {

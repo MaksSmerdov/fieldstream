@@ -152,12 +152,12 @@ const SAMPLES: { readonly [K in TopicKey]: PayloadOf<K> } = {
 describe('манифест топиков', () => {
   it('имя топика непустое, с префиксом системы и версией схемы', () => {
     const wrong = SPECS.map((spec) => spec.name).filter(
-      (name) => !/^fieldstream\.[a-z0-9]+(\.[a-z0-9]+)*\.v1$/.test(name),
+      (name) => !/^fieldstream\.[a-z0-9]+(\.[a-z0-9]+)*\.v[1-9]\d*$/.test(name),
     );
 
     expect(wrong).toEqual([]);
     expect(SPECS.every((spec) => spec.name.startsWith('fieldstream.'))).toBe(true);
-    expect(SPECS.every((spec) => spec.name.endsWith('.v1'))).toBe(true);
+    expect(SPECS.every((spec) => /\.v[1-9]\d*$/.test(spec.name))).toBe(true);
   });
 
   it('имена топиков уникальны и совпадают со списком TOPIC_NAMES', () => {
@@ -241,7 +241,17 @@ describe('манифест топиков', () => {
     ];
 
     expect(keys.filter((key) => key.length === 0)).toEqual([]);
-    expect(keys).toEqual(['RC-101', 'L1', 'RC-101', 'RC-101', 'RC-101']);
+    expect(keys).toEqual(['RC-101', 'RC-101', 'RC-101', 'RC-101', 'RC-101']);
+  });
+
+  it('у сырых кадров и циклов одинаковое число партиций и ключ одного вида', () => {
+    const frame = { ...SAMPLES.telemetryRaw, deviceCode: 'PM-207', lineCode: 'L3' };
+    const cycle = { ...SAMPLES.pollCycles, deviceCode: 'PM-207', lineCode: 'L3' };
+
+    expect(TOPICS.pollCycles.partitions).toBe(TOPICS.telemetryRaw.partitions);
+    expect(TOPICS.telemetryRaw.keyOf(frame)).toBe(frame.deviceCode);
+    expect(TOPICS.pollCycles.keyOf(cycle)).toBe(cycle.deviceCode);
+    expect(TOPICS.pollCycles.keyOf(cycle)).toBe(TOPICS.telemetryRaw.keyOf(frame));
   });
 
   it('ключ компактируемого топика это идентификатор прибора', () => {

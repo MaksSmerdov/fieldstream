@@ -47,14 +47,17 @@ export const TOPICS = {
     why: 'Семь дней это окно реплея: сырые кадры позволяют переиграть историю исправленным декодером.',
   }),
   pollCycles: define({
-    name: 'fieldstream.collector.cycles.v1',
+    name: 'fieldstream.collector.cycles.v2',
     schema: pollCycleSchema,
-    keyOf: (p) => p.lineCode,
-    partitions: 3,
+    keyOf: (p) => p.deviceCode,
+    partitions: 6,
     cleanupPolicy: 'delete',
     retentionMs: 3 * DAY_MS,
     owner: 'edge-collector',
-    why: 'Пишется даже когда прибор не ответил и кадра нет: иначе отказ невидим.',
+    why:
+      'Пишется даже когда прибор не ответил и кадра нет: иначе отказ невидим. ' +
+      'Ключ и число партиций как у сырых кадров: цикл прибора ложится в партицию с тем же номером, ' +
+      'что и его кадры, и оба потока одного прибора обрабатывает один экземпляр процессора.',
   }),
   lineStatus: define({
     name: 'fieldstream.collector.status.v1',

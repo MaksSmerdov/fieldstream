@@ -2,8 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type pg from 'pg';
 import { DEFAULT_HEALTH_POLICY, TOPICS } from '@fieldstream/contracts';
-import type { DeviceEvent, PollCycle } from '@fieldstream/contracts';
-import { insertDeviceEvents, upsertDeviceStates, withTransaction } from '@fieldstream/db';
+import type { DeviceEvent, DeviceState, PollCycle } from '@fieldstream/contracts';
+import {
+  insertDeviceEvents,
+  lockDeviceStateHandover,
+  upsertDeviceStates,
+  withTransaction,
+} from '@fieldstream/db';
 import { DEMO_STAND } from '@fieldstream/device-profiles';
 import { toIsoTimestamp } from '@fieldstream/domain';
 import type { Clock } from '@fieldstream/domain';
@@ -19,7 +24,9 @@ import type { FrameDraft, HealthTracker } from './tracker.js';
 /**
  * Здоровье приборов. Раз в несколько секунд строит дерево, сохраняет состояние в базу
  * и публикует его в компактируемый топик. Неудача не теряет ни состояние, ни события:
- * они уйдут при следующей проверке.
+ * они уйдут при следующей проверке. Запись идёт под общей блокировкой переезда, и уже под ней
+ * проверяется, что ребаланс не начался, а прибор всё ещё свой: новый владелец читает состояние
+ * под исключительной блокировкой и не пропустит запись, которая к этому моменту уже идёт.
  */
 @Injectable()
 export class HealthService implements OnModuleInit, OnModuleDestroy {
@@ -32,6 +39,8 @@ export class HealthService implements OnModuleInit, OnModuleDestroy {
   private pendingEvents: DeviceEvent[] = [];
   private timer: NodeJS.Timeout | null = null;
   private ticking = false;
+  private stopped = false;
+  private held: () => boolean = () => false;
 
   public constructor(
     @Inject(ENV) env: Env,
@@ -56,7 +65,9 @@ export class HealthService implements OnModuleInit, OnModuleDestroy {
     this.timer.unref();
   }
 
+  /** Остановка до выхода потребителя из группы: после неё здоровье уже ничего не пишет. */
   public onModuleDestroy(): void {
+    this.stopped = true;
     if (this.timer !== null) clearInterval(this.timer);
   }
 
@@ -69,8 +80,23 @@ export class HealthService implements OnModuleInit, OnModuleDestroy {
     return this.tracker.draftFrames();
   }
 
+  /** Условие, пока верно которое публикация ждёт: ребаланс начался, а назначение ещё не применено. */
+  public holdWhile(held: () => boolean): void {
+    this.held = held;
+  }
+
+  /** Отобранные при ребалансе приборы: их состояние теперь публикует новый владелец. */
+  public release(deviceCodes: readonly string[]): void {
+    this.tracker.release(deviceCodes);
+  }
+
+  /** Новые приборы экземпляра вместе с последним записанным состоянием, null если его не прочитать. */
+  public adopt(deviceCodes: readonly string[], restored: readonly DeviceState[] | null): void {
+    this.tracker.adopt(deviceCodes, restored);
+  }
+
   private async tick(): Promise<void> {
-    if (this.ticking || !this.refs.isLoaded()) return;
+    if (this.ticking || this.stopped || this.held() || !this.refs.isLoaded()) return;
     this.ticking = true;
 
     try {
@@ -83,10 +109,14 @@ export class HealthService implements OnModuleInit, OnModuleDestroy {
       const idOf = (code: string): number | undefined => refs.get(code)?.deviceId;
       const pending = this.pendingEvents;
 
-      await withTransaction(this.pool, async (client) => {
+      const written = await withTransaction(this.pool, async (client) => {
+        await lockDeviceStateHandover(client, 'publish');
+        if (this.stopped || this.held()) return null;
+
+        const own = states.filter((state) => this.tracker.owns(state.deviceCode));
         await upsertDeviceStates(
           client,
-          states.flatMap((state) => {
+          own.flatMap((state) => {
             const deviceId = idOf(state.deviceCode);
             return deviceId === undefined ? [] : [{ deviceId, state, updatedAt }];
           }),
@@ -95,18 +125,22 @@ export class HealthService implements OnModuleInit, OnModuleDestroy {
           client,
           pending.flatMap((event) => {
             const deviceId = idOf(event.deviceCode);
-            return deviceId === undefined ? [] : [{ deviceId, event }];
+            return deviceId === undefined || !this.tracker.owns(event.deviceCode)
+              ? []
+              : [{ deviceId, event }];
           }),
         );
+        return own;
       });
+      if (written === null) return;
       this.pendingEvents = this.pendingEvents.slice(pending.length);
 
       await this.producer.send(
-        states.map((state) => this.producer.encode(TOPICS.deviceState, state, state.deviceCode)),
+        written.map((state) => this.producer.encode(TOPICS.deviceState, state, state.deviceCode)),
       );
-      this.tracker.confirmPublished(states);
-      if (states.length > 0)
-        this.log.info({ changed: states.length }, 'состояние приборов обновлено');
+      this.tracker.confirmPublished(written);
+      if (written.length > 0)
+        this.log.info({ changed: written.length }, 'состояние приборов обновлено');
     } catch (error) {
       if (this.throttle('health-tick').pass) {
         this.log.warn(

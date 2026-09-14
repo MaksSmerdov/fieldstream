@@ -15,7 +15,7 @@ import type { OutgoingMessage, RawOutgoingMessage } from '@fieldstream/kafka';
 import { createThrottledLog } from '@fieldstream/nest-common';
 import type { Logger } from '@fieldstream/nest-common';
 import type { Env } from '../config/env.js';
-import { CLOCK, ENV, LOGGER } from '../tokens.js';
+import { CLOCK, ENV, INSTANCE_ID, LOGGER } from '../tokens.js';
 
 export const PRODUCER_NAME = 'stream-processor';
 const RECONNECT_DELAY_MS = 2_000;
@@ -41,10 +41,11 @@ export class ProducerService implements OnModuleInit, OnApplicationShutdown {
     @Inject(ENV) env: Env,
     @Inject(LOGGER) log: Logger,
     @Inject(CLOCK) clock: Clock,
+    @Inject(INSTANCE_ID) instanceId: string,
   ) {
     this.log = log;
     this.kafka = createKafkaClient({
-      clientId: env.KAFKA_CLIENT_ID,
+      clientId: `${env.KAFKA_CLIENT_ID}-${instanceId}`,
       brokers: env.KAFKA_BROKERS,
       log: createThrottledLog(log, clock),
     });

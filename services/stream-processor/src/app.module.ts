@@ -9,12 +9,13 @@ import type { Env } from './config/env.js';
 import { HealthService } from './health/health.service.js';
 import { HealthController } from './http/health.controller.js';
 import { MetricsController } from './http/metrics.controller.js';
-import { CyclesConsumerService } from './ingest/cycles-consumer.service.js';
-import { RawConsumerService } from './ingest/raw-consumer.service.js';
+import { CyclesBatchService } from './ingest/cycles-batch.service.js';
+import { IngestConsumerService } from './ingest/ingest-consumer.service.js';
+import { RawBatchService } from './ingest/raw-batch.service.js';
 import type { ProcessorMetrics } from './metrics/metrics.js';
 import { ProducerService } from './publish/producer.service.js';
 import { DeviceRefsService } from './topology/device-refs.service.js';
-import { CLOCK, ENV, LOGGER, METRICS, POOL } from './tokens.js';
+import { CLOCK, ENV, INSTANCE_ID, LOGGER, METRICS, POOL } from './tokens.js';
 
 export interface AppDeps {
   readonly env: Env;
@@ -22,9 +23,10 @@ export interface AppDeps {
   readonly clock: Clock;
   readonly metrics: ProcessorMetrics;
   readonly pool: pg.Pool;
+  readonly instanceId: string;
 }
 
-/** Модуль процессора. Окружение, логгер, часы и пул соединений создаёт точка входа. */
+/** Модуль процессора. Окружение, логгер, часы, пул соединений и имя экземпляра создаёт точка входа. */
 @Module({})
 export class AppModule {
   public static register(deps: AppDeps): DynamicModule {
@@ -37,12 +39,14 @@ export class AppModule {
         { provide: CLOCK, useValue: deps.clock },
         { provide: METRICS, useValue: deps.metrics },
         { provide: POOL, useValue: deps.pool },
+        { provide: INSTANCE_ID, useValue: deps.instanceId },
         ProducerService,
         DeviceRefsService,
         AlarmRulesService,
         HealthService,
-        RawConsumerService,
-        CyclesConsumerService,
+        RawBatchService,
+        CyclesBatchService,
+        IngestConsumerService,
         CommandResultsService,
       ],
     };
