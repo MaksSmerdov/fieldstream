@@ -176,6 +176,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
     const startedAt = this.clock.now();
     const filters = new Map(this.filters);
     const alarms = new Map(this.alarms);
+    const frames = this.health.draftFrames();
     const alarmOutcomes: AlarmOutcome[] = [];
     const rows: ReadingRow[] = [];
     const readings: TelemetryReading[] = [];
@@ -208,7 +209,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
       readings.push(outcome.reading);
       const deviceId = this.refs.current().get(outcome.observation.deviceCode)?.deviceId;
       if (deviceId !== undefined) {
-        for (const event of this.health.observeFrame(outcome.observation)) {
+        for (const event of frames.observe(outcome.observation)) {
           events.push({ deviceId, event });
         }
 
@@ -319,6 +320,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
     this.attempts.delete(batch.partition);
     this.filters = filters;
     this.alarms = alarms;
+    frames.commit();
     await commitThrough(payload, lastOffset);
     await payload.heartbeat();
     this.metrics.observeBatch(batch.topic, this.clock.now() - startedAt);

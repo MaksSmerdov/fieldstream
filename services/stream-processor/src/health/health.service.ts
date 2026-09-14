@@ -10,12 +10,11 @@ import type { Clock } from '@fieldstream/domain';
 import { createLogThrottle } from '@fieldstream/nest-common';
 import type { Logger } from '@fieldstream/nest-common';
 import type { Env } from '../config/env.js';
-import type { FrameObservation } from '../ingest/frame.js';
 import { ProducerService } from '../publish/producer.service.js';
 import { DeviceRefsService } from '../topology/device-refs.service.js';
 import { CLOCK, ENV, LOGGER, POOL } from '../tokens.js';
 import { createHealthTracker } from './tracker.js';
-import type { HealthTracker } from './tracker.js';
+import type { FrameDraft, HealthTracker } from './tracker.js';
 
 /**
  * Здоровье приборов. Раз в несколько секунд строит дерево, сохраняет состояние в базу
@@ -65,9 +64,9 @@ export class HealthService implements OnModuleInit, OnModuleDestroy {
     this.tracker.observeCycle(cycle);
   }
 
-  /** События из кадров: их пишет потребитель кадров в той же транзакции, что и показания. */
-  public observeFrame(observation: FrameObservation): DeviceEvent[] {
-    return this.tracker.observeFrame(observation);
+  /** Черновик событий кадров пачки: потребитель применяет его после записи. */
+  public draftFrames(): FrameDraft {
+    return this.tracker.draftFrames();
   }
 
   private async tick(): Promise<void> {

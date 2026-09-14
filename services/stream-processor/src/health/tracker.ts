@@ -29,10 +29,16 @@ export interface HealthEvaluation {
   readonly events: readonly DeviceEvent[];
 }
 
+/** Наблюдения по кадрам одной пачки: применяются к трекеру только после записи. */
+export interface FrameDraft {
+  readonly observe: (observation: FrameObservation) => DeviceEvent[];
+  readonly commit: () => void;
+}
+
 /** Здоровье приборов: отказы и успехи из циклов опроса, режим и двери из кадров. */
 export interface HealthTracker {
   readonly observeCycle: (cycle: PollCycle) => void;
-  readonly observeFrame: (observation: FrameObservation) => DeviceEvent[];
+  readonly draftFrames: () => FrameDraft;
   readonly evaluate: () => HealthEvaluation;
   readonly confirmPublished: (states: readonly DeviceState[]) => void;
 }
@@ -133,13 +139,35 @@ export const createHealthTracker = (options: HealthTrackerOptions): HealthTracke
         track.consecutiveErrors += 1;
       }
     },
-    observeFrame: (observation) => {
-      const track = tracks.get(observation.deviceCode);
-      if (track === undefined) return [];
-      track.mode = observation.mode;
-      track.doorOpen = observation.doorOpen;
-      track.defrostActive = observation.defrostActive;
-      return snapshotEvents(observation.deviceCode, track, observation.atMs);
+    draftFrames: () => {
+      const draft = new Map<string, DeviceSnapshot>();
+      return {
+        observe: (observation) => {
+          const track = tracks.get(observation.deviceCode);
+          if (track === undefined) return [];
+          const current: DeviceSnapshot = {
+            deviceCode: observation.deviceCode,
+            atMs: observation.atMs,
+            status: track.status,
+            mode: observation.mode,
+            doorOpen: observation.doorOpen,
+            defrostActive: observation.defrostActive,
+          };
+          const prev = draft.get(observation.deviceCode) ?? track.snapshot;
+          draft.set(observation.deviceCode, current);
+          return detectDeviceEvents(prev, current);
+        },
+        commit: () => {
+          for (const [deviceCode, snapshot] of draft) {
+            const track = tracks.get(deviceCode);
+            if (track === undefined) continue;
+            track.mode = snapshot.mode;
+            track.doorOpen = snapshot.doorOpen;
+            track.defrostActive = snapshot.defrostActive;
+            track.snapshot = { ...snapshot, status: track.status };
+          }
+        },
+      };
     },
     evaluate: () => {
       const nowMs = clock.now();

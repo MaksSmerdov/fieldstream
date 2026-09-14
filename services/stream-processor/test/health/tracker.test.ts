@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_HEALTH_POLICY } from '@fieldstream/contracts';
-import type { PollCycle } from '@fieldstream/contracts';
+import type { DeviceEvent, PollCycle } from '@fieldstream/contracts';
 import { DEMO_STAND } from '@fieldstream/device-profiles';
 import { createFakeClock } from '@fieldstream/domain';
 import type { FakeClock } from '@fieldstream/domain';
 import { createHealthTracker } from '../../src/health/tracker.js';
 import type { HealthTracker } from '../../src/health/tracker.js';
+import type { FrameObservation } from '../../src/ingest/frame.js';
 
 const START = Date.parse('2026-09-11T10:00:00Z');
 
@@ -29,6 +30,21 @@ const cycle = (deviceCode: string, ok: boolean, atMs: number): PollCycle => ({
   requestCount: 4,
   planMode: 'merged',
   traceId: '0123456789abcdef',
+});
+
+const door = (deviceCode: string, atMs: number, doorOpen: boolean): FrameObservation => ({
+  deviceCode,
+  atMs,
+  mode: 'cooling',
+  doorOpen,
+  defrostActive: false,
+});
+
+const doorOpened = (atMs: number): DeviceEvent => ({
+  deviceCode: 'RC-102',
+  kind: 'door_opened',
+  occurredAt: new Date(atMs).toISOString(),
+  payload: {},
 });
 
 const stateOf = (tracker: HealthTracker, code: string): unknown =>
@@ -81,37 +97,49 @@ describe('трекер здоровья', () => {
 
   it('дверь из кадров даёт событие с моментом кадра, а не проверки', () => {
     const { tracker } = make();
-    const observe = (atMs: number, doorOpen: boolean): unknown =>
-      tracker.observeFrame({
-        deviceCode: 'RC-102',
-        atMs,
-        mode: 'cooling',
-        doorOpen,
-        defrostActive: false,
-      });
+    const draft = tracker.draftFrames();
 
-    expect(observe(START + 1_000, false)).toEqual([]);
-    expect(observe(START + 11_000, true)).toEqual([
-      {
-        deviceCode: 'RC-102',
-        kind: 'door_opened',
-        occurredAt: new Date(START + 11_000).toISOString(),
-        payload: {},
-      },
+    expect(draft.observe(door('RC-102', START + 1_000, false))).toEqual([]);
+    expect(draft.observe(door('RC-102', START + 11_000, true))).toEqual([
+      doorOpened(START + 11_000),
     ]);
   });
 
-  it('смена режима публикует новое состояние только этого прибора', () => {
+  it('незаписанная пачка не сдвигает снимок: повтор тех же кадров даёт те же события', () => {
+    const { tracker } = make();
+    const baseline = tracker.draftFrames();
+    baseline.observe(door('RC-102', START + 1_000, false));
+    baseline.commit();
+
+    const failed = tracker.draftFrames();
+    expect(failed.observe(door('RC-102', START + 11_000, true))).toEqual([
+      doorOpened(START + 11_000),
+    ]);
+
+    const retry = tracker.draftFrames();
+    expect(retry.observe(door('RC-102', START + 11_000, true))).toEqual([
+      doorOpened(START + 11_000),
+    ]);
+    retry.commit();
+
+    expect(tracker.draftFrames().observe(door('RC-102', START + 21_000, true))).toEqual([]);
+  });
+
+  it('смена режима публикует новое состояние только этого прибора и только после записи', () => {
     const { tracker } = make();
     tracker.confirmPublished(tracker.evaluate().states);
 
-    tracker.observeFrame({
+    const draft = tracker.draftFrames();
+    draft.observe({
       deviceCode: 'RC-103',
       atMs: START + 5_000,
       mode: 'defrost',
       doorOpen: false,
       defrostActive: true,
     });
+    expect(tracker.evaluate().states).toEqual([]);
+
+    draft.commit();
     const states = tracker.evaluate().states;
 
     expect(states).toHaveLength(1);
