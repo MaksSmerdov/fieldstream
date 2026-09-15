@@ -22,6 +22,9 @@ interface Props {
   readonly onRemove: () => void;
 }
 
+/** Подсказка остаётся читаемой и у заблокированного поля: в ней текущее значение уставки. */
+const READABLE_HELPER = { disabled: false } as const;
+
 const ENABLED_LABEL: Readonly<Record<EnabledChoice, string>> = {
   keep: 'как было',
   on: 'включить',
@@ -97,6 +100,7 @@ export const PatchEditor = ({
           value={draft.metricKey}
           disabled={disabled || metricKeys.length === 0}
           helperText={codes.length === 0 ? 'сначала выберите приборы' : ' '}
+          slotProps={{ formHelperText: READABLE_HELPER }}
           onChange={(event) => {
             const metricKey = event.target.value;
             const available = options.get(metricKey) ?? [];
@@ -152,7 +156,11 @@ export const PatchEditor = ({
                   const text = event.target.value;
                   onEdit(bound.field === 'minValue' ? { minValue: text } : { maxValue: text });
                 }}
-                slotProps={{ inputLabel: { shrink: true }, htmlInput: { step: 'any' } }}
+                slotProps={{
+                  inputLabel: { shrink: true },
+                  htmlInput: { step: 'any' },
+                  formHelperText: READABLE_HELPER,
+                }}
               />
               <Button
                 size="small"
@@ -184,7 +192,11 @@ export const PatchEditor = ({
           onChange={(event) => {
             onEdit({ hysteresis: event.target.value });
           }}
-          slotProps={{ inputLabel: { shrink: true }, htmlInput: { step: 'any', min: 0 } }}
+          slotProps={{
+            inputLabel: { shrink: true },
+            htmlInput: { step: 'any', min: 0 },
+            formHelperText: READABLE_HELPER,
+          }}
         />
 
         <TextField
@@ -199,7 +211,11 @@ export const PatchEditor = ({
           onChange={(event) => {
             onEdit({ debounceCycles: event.target.value });
           }}
-          slotProps={{ inputLabel: { shrink: true }, htmlInput: { step: 1, min: 1, max: 60 } }}
+          slotProps={{
+            inputLabel: { shrink: true },
+            htmlInput: { step: 1, min: 1, max: 60 },
+            formHelperText: READABLE_HELPER,
+          }}
         />
 
         <TextField
@@ -210,6 +226,7 @@ export const PatchEditor = ({
           value={draft.enabled}
           disabled={disabled || !keyChosen}
           helperText={hint('enabled') || ' '}
+          slotProps={{ formHelperText: READABLE_HELPER }}
           onChange={(event) => {
             onEdit({ enabled: event.target.value as EnabledChoice });
           }}
