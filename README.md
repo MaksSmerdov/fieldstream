@@ -1,6 +1,7 @@
 # Fieldstream
 
 [![Проверки](../../actions/workflows/checks.yml/badge.svg)](../../actions/workflows/checks.yml)
+[![Стенд](../../actions/workflows/e2e.yml/badge.svg)](../../actions/workflows/e2e.yml)
 
 Платформа сбора телеметрии с промышленных приборов: **Modbus TCP → Kafka → TimescaleDB → React**.
 Поднимается одной командой, железо не нужно (приборы эмулирует отдельный сервис, говорящий по настоящему протоколу).
