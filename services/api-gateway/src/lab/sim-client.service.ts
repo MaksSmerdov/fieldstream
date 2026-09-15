@@ -9,12 +9,19 @@ import {
 } from '@nestjs/common';
 import type { HttpException } from '@nestjs/common';
 import { z } from 'zod';
-import { simClearFaultsResultSchema, simFaultSchema, simStateSchema } from '@fieldstream/contracts';
+import {
+  simClearFaultsResultSchema,
+  simFaultSchema,
+  simScenarioResponseSchema,
+  simStateSchema,
+} from '@fieldstream/contracts';
 import type {
   LabFaultRequest,
   SimClearFaultsQuery,
   SimClearFaultsResult,
   SimFault,
+  SimScenarioName,
+  SimScenarioResponse,
   SimState,
 } from '@fieldstream/contracts';
 import type { Logger } from '@fieldstream/nest-common';
@@ -72,6 +79,15 @@ export class SimClientService {
       await this.call('DELETE', search.length > 0 ? `/sim/faults?${search}` : '/sim/faults'),
       200,
       simClearFaultsResultSchema,
+    );
+  }
+
+  /** Запуск сценария симулятора: стенд отвечает итогом по каждой поломке сценария. */
+  public async runScenario(name: SimScenarioName): Promise<SimScenarioResponse> {
+    return this.expect(
+      await this.call('POST', `/sim/scenario/${name}`),
+      202,
+      simScenarioResponseSchema,
     );
   }
 

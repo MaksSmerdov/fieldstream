@@ -74,13 +74,34 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - uses: ./.github/actions/stack-up
+        id: stand
         with:
           stand-env: ${{ env.FIELDSTREAM_ENV }}
 
+      # Сумма пределов всех сценариев около 40 минут, обычно прогон идёт вдвое быстрее. Свой
+      # предел у шага нужен, чтобы зависший прогон уронил шаг, а не съел лимит задачи вместе с
+      # диагностикой. Пароль учётки инженера берётся из окружения стенда, второй копии у него нет
+      - name: Сценарии стенда
+        timeout-minutes: 50
+        env:
+          E2E_BASE_URL: http://localhost:8080
+          E2E_EMAIL: engineer@fieldstream.local
+        run: |
+          E2E_PASSWORD="$(printf '%s\n' "$FIELDSTREAM_ENV" | sed -n 's/^DEMO_PASSWORD=//p')" \
+            pnpm scenarios:ci
+
+      # Сценарии интерфейса проверяют другое и идут при любом итоге сценариев стенда, если стенд
+      # поднялся. Контракты они импортируют из собранного пакета, образы стенда его на хост не кладут
+      - name: Контракты для сценариев Playwright
+        if: ${{ !cancelled() && steps.stand.outcome == 'success' }}
+        run: pnpm --filter @fieldstream/contracts run build
+
       - name: Браузер для сценариев
+        if: ${{ !cancelled() && steps.stand.outcome == 'success' }}
         run: pnpm --filter @fieldstream/web exec playwright install --with-deps chromium
 
       - name: Сценарии Playwright
+        if: ${{ !cancelled() && steps.stand.outcome == 'success' }}
         env:
           E2E_BASE_URL: http://localhost:8080
           E2E_CHANNEL: ''

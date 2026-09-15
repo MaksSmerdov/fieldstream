@@ -38,6 +38,20 @@ import {
   recordDlqMessages,
   upsertDeviceStates,
 } from '../../src/store/state.js';
+import {
+  countAlarmsRaisedSince,
+  createScenarioRun,
+  failStaleScenarioRuns,
+  finishScenarioRun,
+  loadActiveAlarmFacts,
+  loadActiveScenarioRun,
+  loadLastScenarioRuns,
+  loadScenarioRun,
+  loadStandDeviceFacts,
+  touchScenarioRun,
+  updateScenarioRunProgress,
+} from '../../src/store/scenarios.js';
+import type { ScenarioRunEntry } from '../../src/store/scenarios.js';
 import { loadDeviceRefs, syncTopology } from '../../src/store/topology.js';
 import { insertPollCycles, insertReadings } from '../../src/store/writer.js';
 import type { ReadingRow } from '../../src/store/writer.js';
@@ -779,5 +793,235 @@ describe('схема базы на настоящей TimescaleDB', () => {
 
     expect(await insertReadings(ingest, series(hot))).toBe(30);
     expect(await insertReadings(ingest, series(hot))).toBe(0);
+  });
+
+  it('на стенде идёт один прогон сценария: второй активный не создаётся, итог освобождает стенд', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const createdAt = '2026-09-15T09:59:00.000Z';
+    const owner = { instanceId: 'gw-a', heartbeatAt: createdAt };
+    const entry = (scenario: string): ScenarioRunEntry => ({
+      scenario,
+      title: `Сценарий ${scenario}`,
+      source: 'ci',
+      requestedBy: 'engineer@fieldstream.local',
+      owner,
+      steps: [
+        {
+          index: 0,
+          kind: 'inject',
+          title: 'Внести поломку',
+          status: 'pending',
+          startedAt: null,
+          finishedAt: null,
+          detail: null,
+        },
+        {
+          index: 1,
+          kind: 'waitFor',
+          title: 'Дождаться размыкателя',
+          status: 'pending',
+          startedAt: null,
+          finishedAt: null,
+          detail: null,
+        },
+      ],
+    });
+
+    const first = await createScenarioRun(api, entry('dead-device'));
+    if (!first.created) throw new Error('первый прогон не создан');
+    expect(first.run).toMatchObject({
+      status: 'queued',
+      source: 'ci',
+      startedAt: null,
+      error: null,
+    });
+
+    const second = await createScenarioRun(api, entry('crc-garbage'));
+    expect(second).toEqual({ created: false, active: first.run });
+
+    const startedAt = '2026-09-15T10:00:00.000Z';
+    const [inject, wait] = first.run.steps;
+    if (inject === undefined || wait === undefined) throw new Error('шаги не записаны');
+    const progress = [
+      { ...inject, status: 'passed', startedAt, finishedAt: startedAt, detail: 'внесена' },
+      { ...wait, status: 'running', startedAt },
+    ] as const;
+    const beat = { ...owner, heartbeatAt: startedAt };
+    const stranger = { instanceId: 'gw-b', heartbeatAt: startedAt };
+    expect(
+      await updateScenarioRunProgress(api, first.run.id, stranger, { steps: [], startedAt }),
+    ).toBe(false);
+    expect(await touchScenarioRun(api, first.run.id, stranger)).toBe(false);
+    expect(
+      await updateScenarioRunProgress(api, first.run.id, beat, { steps: progress, startedAt }),
+    ).toBe(true);
+    expect(await touchScenarioRun(api, first.run.id, beat)).toBe(true);
+    expect(
+      await failStaleScenarioRuns(
+        api,
+        { staleBefore: createdAt, instanceId: 'gw-b' },
+        'чужой пульс свежий',
+        startedAt,
+      ),
+    ).toBe(0);
+    expect(await loadActiveScenarioRun(api)).toMatchObject({
+      id: first.run.id,
+      status: 'running',
+      startedAt,
+      steps: progress,
+    });
+
+    const finishedAt = '2026-09-15T10:05:00.000Z';
+    const outcome = {
+      status: 'passed',
+      steps: [progress[0], { ...progress[1], status: 'passed', finishedAt }],
+      error: null,
+      startedAt,
+      finishedAt,
+    } as const;
+    expect(await finishScenarioRun(api, first.run.id, outcome)).toBe(true);
+    expect(
+      await finishScenarioRun(api, first.run.id, { ...outcome, status: 'failed', error: 'поздно' }),
+    ).toBe(false);
+    expect(
+      await updateScenarioRunProgress(api, first.run.id, beat, {
+        steps: [],
+        startedAt: finishedAt,
+      }),
+    ).toBe(false);
+    expect(await touchScenarioRun(api, first.run.id, beat)).toBe(false);
+    expect(await loadScenarioRun(api, first.run.id)).toMatchObject({
+      status: 'passed',
+      error: null,
+      finishedAt,
+    });
+    expect(await loadActiveScenarioRun(api)).toBeNull();
+
+    const next = await createScenarioRun(api, entry('crc-garbage'));
+    if (!next.created) throw new Error('стенд не освободился после итога');
+    await updateScenarioRunProgress(api, next.run.id, beat, {
+      steps: [{ ...inject, status: 'running', startedAt }, wait],
+      startedAt,
+    });
+
+    expect(
+      await failStaleScenarioRuns(
+        api,
+        { staleBefore: createdAt, instanceId: null },
+        'пульс ещё свежий',
+        finishedAt,
+      ),
+    ).toBe(0);
+    expect(
+      await failStaleScenarioRuns(
+        api,
+        { staleBefore: finishedAt, instanceId: null },
+        'шлюз перезапустился',
+        finishedAt,
+      ),
+    ).toBe(1);
+    expect(await loadScenarioRun(api, next.run.id)).toMatchObject({
+      status: 'failed',
+      error: 'шлюз перезапустился',
+      finishedAt,
+      steps: [
+        { status: 'failed', finishedAt, detail: 'шлюз перезапустился' },
+        { status: 'skipped', finishedAt: null },
+      ],
+    });
+    expect(await loadScenarioRun(api, crypto.randomUUID())).toBeNull();
+
+    const last = await loadLastScenarioRuns(api);
+    expect(last.map((run) => [run.scenario, run.status])).toEqual([
+      ['crc-garbage', 'failed'],
+      ['dead-device', 'passed'],
+    ]);
+
+    await expect(
+      api.query('DELETE FROM core.scenario_run WHERE id = $1', [first.run.id]),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      api.query(
+        `INSERT INTO core.scenario_run (scenario, title, source, requested_by, status)
+         VALUES ('x', 'x', 'cli', 'x', 'queued')`,
+      ),
+    ).rejects.toThrow(/check constraint/);
+  });
+
+  it('факты стенда для сценариев читаются ролью интерфейса', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const base = await hoursAgo(ingest, 0);
+    const updatedAt = new Date(base).toISOString();
+    const state = {
+      schema: 'device.state',
+      v: 1,
+      deviceCode: 'RC-112',
+      status: 'online',
+      reason: 'ok',
+      since: updatedAt,
+      mode: 'defrost',
+      lastOkAt: updatedAt,
+      consecutiveErrors: 0,
+    } as const;
+
+    await upsertDeviceStates(ingest, [
+      { deviceId: await deviceId(ingest, 'RC-112'), state, updatedAt },
+      {
+        deviceId: await deviceId(ingest, 'PM-205'),
+        state: { ...state, deviceCode: 'PM-205', status: 'degraded', mode: 'cooling' },
+        updatedAt,
+      },
+    ]);
+
+    const episode = async (offsetMs: number): Promise<AlarmEventRow> => {
+      const occurredAt = new Date(base + offsetMs).toISOString();
+      return {
+        alarmId: crypto.randomUUID(),
+        deviceId: await deviceId(ingest, 'RC-112'),
+        metricKey: 'evap_temp_c',
+        mode: 'cooling',
+        severity: 'warning',
+        boundary: 'max',
+        value: 3,
+        threshold: 0,
+        occurredAt,
+        dedupeKey: `RC-112|evap_temp_c|cooling|raised|${occurredAt}`,
+      };
+    };
+    const rows = [await episode(-60_000), await episode(1_000), await episode(2_000)];
+    await insertAlarmEvents(ingest, rows);
+    await clearAlarmEvents(ingest, [
+      ...rows.slice(0, 2).map((row) => ({
+        dedupeKey: row.dedupeKey,
+        clearedAt: new Date(base + 3_000).toISOString(),
+        clearedValue: -1,
+      })),
+    ]);
+
+    const devices = await loadStandDeviceFacts(api);
+    const byCode = new Map(devices.map((device) => [device.deviceCode, device]));
+    expect(devices).toHaveLength(24);
+    expect(byCode.get('RC-112')).toEqual({
+      deviceCode: 'RC-112',
+      profileKey: 'rc-2000',
+      status: 'online',
+      reason: 'ok',
+      mode: 'defrost',
+    });
+    expect(byCode.get('PM-205')).toMatchObject({ status: 'degraded', mode: null });
+    expect(byCode.get('RC-109')).toMatchObject({
+      status: 'unknown',
+      reason: 'no_data',
+      mode: null,
+    });
+
+    const active = await loadActiveAlarmFacts(api);
+    expect(active.filter((alarm) => alarm.deviceCode === 'RC-112')).toEqual([
+      { deviceCode: 'RC-112', metricKey: 'evap_temp_c' },
+    ]);
+
+    const raised = await countAlarmsRaisedSince(api, updatedAt);
+    expect(raised['evap_temp_c']).toBe(2);
   });
 });

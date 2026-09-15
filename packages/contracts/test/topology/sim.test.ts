@@ -3,6 +3,7 @@ import {
   simClearFaultsQuerySchema,
   simClearFaultsResultSchema,
   simFaultRequestSchema,
+  simScenarioResponseSchema,
   simSpeedRequestSchema,
 } from '../../src/topology/sim.js';
 
@@ -101,6 +102,43 @@ describe('simClearFaultsResultSchema', () => {
     expect(accepts({ removed: -1 })).toBe(false);
     expect(accepts({ removed: 1.5 })).toBe(false);
     expect(accepts({ removed: 1, extra: true })).toBe(false);
+  });
+});
+
+describe('simScenarioResponseSchema', () => {
+  it('разбирает поломку, разовое действие и отказ стенда', () => {
+    const response = {
+      scenario: 'night-defrost',
+      results: [
+        {
+          outcome: 'fault',
+          fault: {
+            id: 'fault-1',
+            targetKind: 'line',
+            targetId: 'L2',
+            kind: 'offline',
+            since: '2026-09-15T10:00:00.000Z',
+            expiresAt: '2026-09-15T10:03:00.000Z',
+            exceptionCode: null,
+            paramKey: null,
+          },
+        },
+        { outcome: 'action', action: 'defrost_started', deviceCode: 'RC-101' },
+        { outcome: 'rejected', status: 404, message: 'прибора RC-999 нет' },
+      ],
+    };
+
+    expect(simScenarioResponseSchema.parse(response)).toEqual(response);
+  });
+
+  it('неизвестный исход и лишние поля отвергаются', () => {
+    const accepts = (results: unknown[]): boolean =>
+      simScenarioResponseSchema.safeParse({ scenario: 'power-dip', results }).success;
+
+    expect(accepts([{ outcome: 'skipped' }])).toBe(false);
+    expect(
+      accepts([{ outcome: 'action', action: 'defrost_started', deviceCode: 'RC-101', extra: 1 }]),
+    ).toBe(false);
   });
 });
 

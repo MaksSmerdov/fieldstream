@@ -115,6 +115,32 @@ export const simScenarioNameSchema = z.enum([
 ]);
 export type SimScenarioName = z.infer<typeof simScenarioNameSchema>;
 
+/** Итог одной поломки сценария симулятора: поломка, разовое действие или отказ стенда. */
+export const simScenarioResultSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('fault'), fault: simFaultSchema }).strict(),
+  z
+    .object({
+      outcome: z.literal('action'),
+      action: z.literal('defrost_started'),
+      deviceCode: deviceCodeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      outcome: z.literal('rejected'),
+      status: z.number().int(),
+      message: z.string(),
+    })
+    .strict(),
+]);
+export type SimScenarioResult = z.infer<typeof simScenarioResultSchema>;
+
+/** Ответ стенда на запуск сценария: по итогу на каждую поломку сценария. */
+export const simScenarioResponseSchema = z
+  .object({ scenario: simScenarioNameSchema, results: z.array(simScenarioResultSchema) })
+  .strict();
+export type SimScenarioResponse = z.infer<typeof simScenarioResponseSchema>;
+
 /** Ускорение времени стенда: на 60x сутки проживаются за 24 минуты. */
 export const simSpeedRequestSchema = z.object({ factor: z.number().min(1).max(60) }).strict();
 export type SimSpeedRequest = z.infer<typeof simSpeedRequestSchema>;

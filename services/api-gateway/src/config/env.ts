@@ -60,6 +60,8 @@ const envSchema = z.object({
   PIPELINE_POLL_MS: z.coerce.number().int().min(500).max(60_000).default(2_000),
   COLLECTOR_STATUS: z.enum(['on', 'off']).default('on'),
   SIM_URL: z.string().url().optional(),
+  SCENARIOS_DIR: z.string().min(1).optional(),
+  SCENARIO_POLL_MS: z.coerce.number().int().min(50).max(10_000).default(1_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

@@ -28,6 +28,8 @@ import { AlarmsController } from './read/alarms.controller.js';
 import { BootController } from './read/boot.controller.js';
 import { DevicesController } from './read/devices.controller.js';
 import { TopologyController } from './read/topology.controller.js';
+import { ScenariosController } from './scenarios/scenarios.controller.js';
+import { ScenariosService } from './scenarios/scenarios.service.js';
 import { DeviceRefsService } from './topology/device-refs.service.js';
 import { CLOCK, ENV, INSTANCE_ID, LOGGER, METRICS, POOL } from './tokens.js';
 
@@ -60,6 +62,7 @@ export class AppModule {
         PipelineController,
         DlqController,
         LabController,
+        ScenariosController,
       ],
       providers: [
         { provide: ENV, useValue: deps.env },
@@ -78,6 +81,7 @@ export class AppModule {
         PipelineSamplerService,
         LineStatusService,
         SimClientService,
+        ScenariosService,
       ],
     };
   }

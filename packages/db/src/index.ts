@@ -7,6 +7,7 @@ export * from './store/dlq.js';
 export * from './store/outbox.js';
 export * from './store/rate-limit.js';
 export * from './store/read.js';
+export * from './store/scenarios.js';
 export * from './store/sessions.js';
 export * from './store/state.js';
 export * from './store/topology.js';
