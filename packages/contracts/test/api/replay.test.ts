@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { describe, expect, it } from 'vitest';
 import {
   FINISHED_REPLAY_RUN_STATUSES,
+  REPLAY_EPISODES_LIMIT,
   REPLAY_GROUP_PREFIX,
   REPLAY_MAX_DEVICES,
   REPLAY_MAX_PATCHES,
@@ -389,11 +390,29 @@ describe('эпизоды строки разницы', () => {
         { ...EPISODE, raisedAt: at(60_000), clearedAt: at(120_000), clearedValue: 7 },
         EPISODE,
       ],
+      truncated: false,
     };
 
     expect(replayEpisodesResponseSchema.parse(response)).toEqual(response);
     expect(issuesOf(replayEpisodesResponseSchema, { ...response, runId: 'run-1' })).toEqual([
       { path: ['runId'], message: 'Invalid uuid' },
     ]);
+    const { runId, deviceCode, metricKey, mode, baseline, patched } = response;
+    expect(
+      issuesOf(replayEpisodesResponseSchema, {
+        runId,
+        deviceCode,
+        metricKey,
+        mode,
+        baseline,
+        patched,
+      }),
+    ).toEqual([{ path: ['truncated'], message: 'Required' }]);
+    expect(
+      issuesOf(replayEpisodesResponseSchema, {
+        ...response,
+        baseline: Array.from({ length: REPLAY_EPISODES_LIMIT + 1 }, () => EPISODE),
+      }).map((issue) => issue.path),
+    ).toEqual([['baseline']]);
   });
 });

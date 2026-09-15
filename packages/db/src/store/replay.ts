@@ -453,11 +453,15 @@ export const pruneReplayRuns = async (client: pg.ClientBase, keep: number): Prom
 /** Эпизоды обоих вариантов одной строки разницы. */
 export type ReplayVariantEpisodes = Pick<ReplayEpisodesResponse, 'baseline' | 'patched'>;
 
-/** Эпизоды строки (прибор, метрика, режим) по вариантам, по времени подъёма. */
+/**
+ * Эпизоды строки (прибор, метрика, режим) по вариантам, по времени подъёма. С пределом limit
+ * в каждом варианте не больше limit первых эпизодов.
+ */
 export const loadReplayEpisodes = async (
   client: pg.ClientBase,
   runId: string,
   key: ReplayEpisodesQuery,
+  limit?: number,
 ): Promise<ReplayVariantEpisodes> => {
   const result = await client.query<{
     variant: ReplayVariant;
@@ -472,12 +476,18 @@ export const loadReplayEpisodes = async (
     cleared_at: Date | null;
     cleared_value: number | null;
   }>(
-    `SELECT e.variant, d.code AS device_code, e.metric_key, e.mode, e.severity, e.boundary,
-            e.value, e.threshold, e.raised_at, e.cleared_at, e.cleared_value
-     FROM core.replay_alarm_episode e JOIN core.devices d ON d.id = e.device_id
-     WHERE e.run_id = $1 AND d.code = $2 AND e.metric_key = $3 AND e.mode = $4
-     ORDER BY e.raised_at`,
-    [runId, key.deviceCode, key.metricKey, key.mode],
+    `SELECT variant, device_code, metric_key, mode, severity, boundary,
+            value, threshold, raised_at, cleared_at, cleared_value
+     FROM (
+       SELECT e.variant, d.code AS device_code, e.metric_key, e.mode, e.severity, e.boundary,
+              e.value, e.threshold, e.raised_at, e.cleared_at, e.cleared_value,
+              row_number() OVER (PARTITION BY e.variant ORDER BY e.raised_at) AS n
+       FROM core.replay_alarm_episode e JOIN core.devices d ON d.id = e.device_id
+       WHERE e.run_id = $1 AND d.code = $2 AND e.metric_key = $3 AND e.mode = $4
+     ) ranked
+     WHERE $5::integer IS NULL OR n <= $5::integer
+     ORDER BY raised_at`,
+    [runId, key.deviceCode, key.metricKey, key.mode, limit ?? null],
   );
   const episodes: ReplayVariantEpisodes = { baseline: [], patched: [] };
 

@@ -1493,6 +1493,10 @@ describe('схема базы на настоящей TimescaleDB', () => {
       baseline: episodesOf('baseline'),
       patched: episodesOf('patched'),
     });
+    expect(await loadReplayEpisodes(api, older.id, key, 1)).toEqual({
+      baseline: episodesOf('baseline').slice(0, 1),
+      patched: episodesOf('patched').slice(0, 1),
+    });
     expect(await loadReplayEpisodes(api, older.id, { ...key, mode: 'cooling' })).toEqual({
       baseline: [],
       patched: [],

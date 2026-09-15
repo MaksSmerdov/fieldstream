@@ -36,6 +36,12 @@ export const REPLAY_RETENTION_MS = retentionOf(TOPICS.telemetryRaw);
 export const REPLAY_MAX_DEVICES = 24;
 export const REPLAY_MAX_PATCHES = 20;
 
+/** Сколько завершённых прогонов хранится вместе с эпизодами: столько же показывает список. */
+export const REPLAY_KEPT_RUNS = 20;
+
+/** Предел эпизодов одного варианта в ответе графику: сверх него показываются первые по времени. */
+export const REPLAY_EPISODES_LIMIT = 2_000;
+
 /** Временная группа потребителя перепрогона. Боевые группы с этого префикса не начинаются. */
 export const REPLAY_GROUP_PREFIX = 'fs-replay-';
 
@@ -255,15 +261,19 @@ export const replayEpisodesQuerySchema = z
   .strict();
 export type ReplayEpisodesQuery = z.infer<typeof replayEpisodesQuerySchema>;
 
-/** Эпизоды обоих вариантов одной строки разницы. */
+/**
+ * Эпизоды обоих вариантов одной строки разницы. truncated: хотя бы в одном варианте эпизодов
+ * больше REPLAY_EPISODES_LIMIT, и в ответе только первые по времени.
+ */
 export const replayEpisodesResponseSchema = z
   .object({
     runId: z.string().uuid(),
     deviceCode: deviceCodeSchema,
     metricKey: z.string().min(1),
     mode: deviceModeSchema,
-    baseline: z.array(replayEpisodeSchema),
-    patched: z.array(replayEpisodeSchema),
+    baseline: z.array(replayEpisodeSchema).max(REPLAY_EPISODES_LIMIT),
+    patched: z.array(replayEpisodeSchema).max(REPLAY_EPISODES_LIMIT),
+    truncated: z.boolean(),
   })
   .strict();
 export type ReplayEpisodesResponse = z.infer<typeof replayEpisodesResponseSchema>;
