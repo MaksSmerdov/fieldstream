@@ -16,6 +16,8 @@ import {
   meResponseSchema,
   pipelineResponseSchema,
   readPlanResponseSchema,
+  scenarioRunSchema,
+  scenariosResponseSchema,
   seriesResponseSchema,
   sessionResponseSchema,
   simClearFaultsResultSchema,
@@ -47,6 +49,9 @@ import type {
   PipelineResponse,
   PlanMode,
   ReadPlanResponse,
+  ScenarioRun,
+  ScenarioRunRequestInput,
+  ScenariosResponse,
   SeriesResponse,
   SessionResponse,
   SimClearFaultsQuery,
@@ -206,4 +211,16 @@ export const api = {
       (value) => simClearFaultsResultSchema.parse(value),
       { method: 'DELETE' },
     ),
+
+  scenarios: async (): Promise<ScenariosResponse> =>
+    request('/api/scenarios', (value) => scenariosResponseSchema.parse(value)),
+
+  runScenario: async (name: string): Promise<ScenarioRun> =>
+    request(`/api/scenarios/${name}/run`, (value) => scenarioRunSchema.parse(value), {
+      method: 'POST',
+      body: { source: 'ui' } satisfies ScenarioRunRequestInput,
+    }),
+
+  scenarioRun: async (id: string): Promise<ScenarioRun> =>
+    request(`/api/scenario-runs/${id}`, (value) => scenarioRunSchema.parse(value)),
 };

@@ -30,4 +30,6 @@ export const queryKeys = {
   dlqRedrive: (id: string) => ['dlq', 'redrive', id] as const,
   labLines: ['lab', 'lines'] as const,
   labFaults: ['lab', 'faults'] as const,
+  scenarios: ['lab', 'scenarios'] as const,
+  scenarioRun: (id: string) => ['lab', 'scenario-runs', id] as const,
 };

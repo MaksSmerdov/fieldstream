@@ -1,0 +1,26 @@
+.scenarios {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+
+  &__head {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__title {
+    scroll-margin-top: 72px;
+  }
+
+  &__notice {
+    align-items: flex-start;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    align-items: stretch;
+    gap: 16px;
+  }
+}

@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { hasPermission } from '@fieldstream/contracts';
 import { ChaosPanel } from '../features/lab/components/ChaosPanel/ChaosPanel.js';
 import { LineInstruments } from '../features/lab/components/LineInstruments/LineInstruments.js';
+import { ScenarioSection } from '../features/lab/components/scenarios/ScenarioSection/ScenarioSection.js';
 import { useLabLines } from '../features/lab/hooks/useLabLines.js';
 import { useLabTopology } from '../features/lab/hooks/useLabTopology.js';
 import { useServerNow } from '../features/lab/hooks/useServerNow.js';
@@ -15,7 +16,7 @@ import { ErrorState } from '../shared/ui/ErrorState/ErrorState.js';
 import { SkeletonBlock } from '../shared/ui/SkeletonBlock/SkeletonBlock.js';
 import styles from './LabPage.module.scss';
 
-/** Лаборатория отказов: поломки стенда и приборы защитных механизмов сборщика. */
+/** Лаборатория отказов: поломки стенда, приборы защитных механизмов сборщика и сценарии стенда. */
 export const LabPage = (): React.JSX.Element => {
   const [params, setParams] = useSearchParams();
   const nowMs = useServerNow();
@@ -23,6 +24,7 @@ export const LabPage = (): React.JSX.Element => {
   const topology = useLabTopology();
   const permissions = useSessionStore((state) => state.user?.permissions);
   const canInject = hasPermission(permissions ?? [], 'lab.inject');
+  const canRun = hasPermission(permissions ?? [], 'scenarios.run');
 
   const lines = useMemo(
     () => chaosLines(topology.topology, snapshots.lines),
@@ -104,6 +106,10 @@ export const LabPage = (): React.JSX.Element => {
           </div>
         </div>
       ) : null}
+
+      <div className={styles['lab__scenarios']}>
+        <ScenarioSection canRun={canRun} nowMs={nowMs} />
+      </div>
     </>
   );
 };

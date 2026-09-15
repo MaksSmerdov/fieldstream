@@ -8,6 +8,7 @@ import {
   labFaultRequestSchema,
   labFaultsResponseSchema,
   labLinesResponseSchema,
+  scenariosResponseSchema,
   simClearFaultsQuerySchema,
   simFaultSchema,
   topologyResponseSchema,
@@ -210,6 +211,13 @@ const route = (path: string, init?: RequestInit): Promise<Response> => {
     return stand.linesStatus === 200
       ? reply(200, labLinesResponseSchema.parse({ serverTime: SERVER_TIME, lines: stand.lines }))
       : reply(stand.linesStatus, { message: 'шлюз недоступен' });
+  }
+
+  if (url.pathname === '/api/scenarios') {
+    return reply(
+      200,
+      scenariosResponseSchema.parse({ serverTime: SERVER_TIME, scenarios: [], activeRun: null }),
+    );
   }
 
   if (url.pathname !== '/api/lab/faults') return reply(404, { message: 'нет такого адреса' });

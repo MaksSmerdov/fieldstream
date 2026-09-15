@@ -1,0 +1,86 @@
+.scenario {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px 12px;
+  }
+
+  &__title {
+    display: grid;
+    flex: 1 1 180px;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__facts {
+    color: var(--mui-palette-text-secondary);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  &__description {
+    overflow-wrap: anywhere;
+  }
+
+  &__steps {
+    display: grid;
+    justify-items: start;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  &__toggle {
+    margin-left: -6px;
+  }
+
+  &__list {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding-left: 22px;
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+  }
+
+  &__notice {
+    align-items: flex-start;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    min-height: 40px;
+    margin-top: auto;
+  }
+
+  &__launch {
+    flex: none;
+    white-space: nowrap;
+
+    &_waiting {
+      opacity: 0.6;
+    }
+  }
+
+  &__hint {
+    flex: 1 1 180px;
+    min-width: 0;
+    color: var(--mui-palette-text-secondary);
+  }
+}
+
+@media (max-width: 480px) {
+  .scenario {
+    padding: 12px;
+  }
+}
