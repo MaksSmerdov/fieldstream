@@ -204,6 +204,38 @@ describe('опрос конвейера при сбоях брокера', () =>
   });
 });
 
+describe('темп топиков', () => {
+  it('пачка сообщений не превращает темп в ноль на следующем опросе: темп считается по окну', async () => {
+    const { clock, broker, sampler } = setup();
+    const rate = (): number | null | undefined =>
+      sampler.current().topics.find((topic) => topic.name === TOPIC)?.messagesPerSec;
+
+    await sampler.sample();
+    clock.advance(2_000);
+    broker.highs = [20, 30];
+    await sampler.sample();
+    expect(rate()).toBe(10);
+
+    clock.advance(2_000);
+    await sampler.sample();
+    expect(rate()).toBe(5);
+  });
+
+  it('замеры старше окна в темп не входят', async () => {
+    const { clock, broker, sampler } = setup();
+
+    await sampler.sample();
+    clock.advance(40_000);
+    broker.highs = [30, 40];
+    await sampler.sample();
+    clock.advance(2_000);
+    broker.highs = [34, 40];
+    await sampler.sample();
+
+    expect(sampler.current().topics.find((topic) => topic.name === TOPIC)?.messagesPerSec).toBe(2);
+  });
+});
+
 describe('фоновый опрос', () => {
   it('выключенный опрос к брокеру не обращается', () => {
     const { admin, sampler } = setup({ PIPELINE_SAMPLER: 'off' });

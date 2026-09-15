@@ -41,6 +41,22 @@ interface Sample {
 
 const TOPIC_SPECS = Object.values(TOPICS);
 
+/** Окно темпа: сборщик шлёт пачками, и темп по соседним опросам скакал бы между нулём и всплеском. */
+const RATE_WINDOW_MS = 30_000;
+
+/** Самый старый замер в окне темпа, а если все старше окна, то последний. */
+const rateBase = <T extends { readonly atMs: number }>(
+  history: readonly T[],
+  nowMs: number,
+): T | null =>
+  history.find((item) => item.atMs >= nowMs - RATE_WINDOW_MS) ?? history.at(-1) ?? null;
+
+/** История замеров без вышедших из окна темпа, плюс новый замер. */
+const withinWindow = <T extends { readonly atMs: number }>(history: readonly T[], next: T): T[] => [
+  ...history.filter((item) => item.atMs >= next.atMs - RATE_WINDOW_MS),
+  next,
+];
+
 /** Раскладка участника. Пустой буфер означает, что раскладки ещё нет. */
 const assignmentsOf = (buffer: Buffer): PipelineMember['assignments'] => {
   if (buffer.length === 0) return [];
@@ -81,8 +97,8 @@ export class PipelineSamplerService implements OnApplicationBootstrap, BeforeApp
     groups: [],
     rebalances: [],
   };
-  private last: Sample | null = null;
-  private events: Reading | null = null;
+  private history: Sample[] = [];
+  private events: Reading[] = [];
   private eventsRate = 0;
 
   public constructor(
@@ -163,14 +179,15 @@ export class PipelineSamplerService implements OnApplicationBootstrap, BeforeApp
 
   private observeEvents(nowMs: number): void {
     const current = { value: this.bus.publishedEvents(), atMs: nowMs };
-    const rate = ratePerSec(this.events, current);
+    const rate = ratePerSec(rateBase(this.events, nowMs), current);
     if (rate !== null) this.eventsRate = rate;
-    this.events = current;
+    this.events = withinWindow(this.events, current);
   }
 
   /** Полный снимок брокера. Любая ошибка оставляет прежний снимок нетронутым. */
   private async collect(nowMs: number): Promise<void> {
-    const previous = this.last;
+    const previous = this.history.at(-1) ?? null;
+    const base = rateBase(this.history, nowMs);
     const ends = new Map<string, PartitionEnd[]>(
       await Promise.all(
         TOPIC_SPECS.map(async (spec): Promise<[string, PartitionEnd[]]> => {
@@ -194,7 +211,7 @@ export class PipelineSamplerService implements OnApplicationBootstrap, BeforeApp
     );
 
     const topics: PipelineTopic[] = TOPIC_SPECS.map((spec) => {
-      const before = previous?.highs.get(spec.name);
+      const before = base?.highs.get(spec.name);
       const current = { value: highs.get(spec.name) ?? 0, atMs: nowMs };
 
       return {
@@ -203,9 +220,9 @@ export class PipelineSamplerService implements OnApplicationBootstrap, BeforeApp
         cleanupPolicy: spec.cleanupPolicy,
         partitions: ends.get(spec.name) ?? [],
         messagesPerSec:
-          previous === null || before === undefined
+          base === null || before === undefined
             ? null
-            : ratePerSec({ value: before, atMs: previous.atMs }, current),
+            : ratePerSec({ value: before, atMs: base.atMs }, current),
       };
     });
     const rates = new Map(topics.map((topic) => [topic.name, topic.messagesPerSec]));
@@ -261,7 +278,7 @@ export class PipelineSamplerService implements OnApplicationBootstrap, BeforeApp
         ),
       ),
     );
-    this.last = { atMs: nowMs, highs, settled };
+    this.history = withinWindow(this.history, { atMs: nowMs, highs, settled });
     this.view = {
       sampledAt: at,
       brokerError: null,
