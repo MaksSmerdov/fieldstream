@@ -13,9 +13,17 @@ describe('действующие права', () => {
       'devices',
       'alarms',
       'pipeline',
+      'lab',
     ]);
     expect(getEffectivePermissions('engineer')).toContain('alarm-rules.edit');
     expect(getEffectivePermissions('viewer')).not.toContain('alarm-rules.edit');
+  });
+
+  it('смотреть на конвейер и стенд может любой, вмешиваться только инженер', () => {
+    for (const control of ['pipeline.control', 'lab.inject', 'scenarios.run'] as const) {
+      expect(getEffectivePermissions('viewer')).not.toContain(control);
+      expect(getEffectivePermissions('engineer')).toContain(control);
+    }
     expect(getEffectivePermissions('admin')).toEqual([...MODULES]);
   });
 

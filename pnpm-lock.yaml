@@ -281,6 +281,31 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
 
+  packages/scenarios:
+    dependencies:
+      '@fieldstream/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@fieldstream/domain':
+        specifier: workspace:*
+        version: link:../domain
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.2
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+
   services/api-gateway:
     dependencies:
       '@fastify/cookie':
@@ -304,6 +329,9 @@ importers:
       '@fieldstream/nest-common':
         specifier: workspace:*
         version: link:../../packages/nest-common
+      '@fieldstream/scenarios':
+        specifier: workspace:*
+        version: link:../../packages/scenarios
       '@nestjs/common':
         specifier: ^12.0.1
         version: 12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -350,6 +378,9 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+      testcontainers:
+        specifier: ^12.1.0
+        version: 12.1.0
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -527,6 +558,31 @@ importers:
 
   tools/arch-check:
     devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+
+  tools/scenario-ci:
+    dependencies:
+      '@fieldstream/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@fieldstream/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.2
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
       typescript:
         specifier: ^5.6.3
         version: 5.9.3

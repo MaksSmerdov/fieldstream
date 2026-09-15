@@ -1,8 +1,13 @@
 name: Стенд
 
 # Тяжёлые проверки: они поднимают настоящие Kafka, TimescaleDB и весь стенд в Docker,
-# поэтому идут по расписанию и по кнопке, а не на каждый пуш
+# поэтому идут на запрос слияния в main, на main, по расписанию и по кнопке,
+# а не на каждый пуш в рабочие ветки
 on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   schedule:
     - cron: '17 2 * * *'
   workflow_dispatch:
@@ -56,9 +61,9 @@ jobs:
         run: pnpm test:integration
 
   stack:
-    name: Сценарии интерфейса против поднятого стенда
+    name: Сценарии против поднятого стенда
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -71,38 +76,35 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Окружение стенда
-        run: printf '%s\n' "$FIELDSTREAM_ENV" > .env
+      - uses: ./.github/actions/stack-up
+        id: stand
+        with:
+          stand-env: ${{ env.FIELDSTREAM_ENV }}
 
-      - name: Поднять стенд
-        run: docker compose -f infra/compose/docker-compose.yml up -d --build
-
-      # Панель готовности отвечает раньше, чем стенд действительно готов: ждём не порт,
-      # а признак готовности, который стенд выставляет сам после засева истории.
-      # Стадии печатаются по ходу ожидания, иначе упавший прогон не говорит, на чём он встал
-      - name: Дождаться готовности
+      # Сумма пределов всех сценариев около 40 минут, обычно прогон идёт вдвое быстрее. Свой
+      # предел у шага нужен, чтобы зависший прогон уронил шаг, а не съел лимит задачи вместе с
+      # диагностикой. Пароль учётки инженера берётся из окружения стенда, второй копии у него нет
+      - name: Сценарии стенда
+        timeout-minutes: 50
+        env:
+          E2E_BASE_URL: http://localhost:8080
+          E2E_EMAIL: engineer@fieldstream.local
         run: |
-          for attempt in $(seq 1 180); do
-            boot=$(curl -sf http://localhost:8080/api/boot || true)
-            case "$boot" in
-              *'"ready":true'*)
-                echo "стенд готов за $((attempt * 5)) с"
-                exit 0
-                ;;
-            esac
-            if [ $((attempt % 12)) -eq 0 ]; then
-              echo "$((attempt * 5)) с: ${boot:-панель готовности не отвечает}"
-            fi
-            sleep 5
-          done
-          echo "стенд не поднялся за 15 минут, последнее состояние:"
-          curl -s http://localhost:8080/api/boot || echo "панель готовности не отвечает"
-          exit 1
+          E2E_PASSWORD="$(printf '%s\n' "$FIELDSTREAM_ENV" | sed -n 's/^DEMO_PASSWORD=//p')" \
+            pnpm scenarios:ci
+
+      # Сценарии интерфейса проверяют другое и идут при любом итоге сценариев стенда, если стенд
+      # поднялся. Контракты они импортируют из собранного пакета, образы стенда его на хост не кладут
+      - name: Контракты для сценариев Playwright
+        if: ${{ !cancelled() && steps.stand.outcome == 'success' }}
+        run: pnpm --filter @fieldstream/contracts run build
 
       - name: Браузер для сценариев
+        if: ${{ !cancelled() && steps.stand.outcome == 'success' }}
         run: pnpm --filter @fieldstream/web exec playwright install --with-deps chromium
 
       - name: Сценарии Playwright
+        if: ${{ !cancelled() && steps.stand.outcome == 'success' }}
         env:
           E2E_BASE_URL: http://localhost:8080
           E2E_CHANNEL: ''

@@ -7,6 +7,7 @@ import {
   traceIdSchema,
 } from '../primitives.js';
 import { deviceModeSchema, planModeSchema } from '../topology/device.js';
+import { breakerStateSchema } from './collector.js';
 import { healthReasonSchema, healthStatusSchema } from './health.js';
 
 /** Итог одного обращения к прибору. Отдельно от телеметрии, потому что пишется и при отказе. */
@@ -33,7 +34,7 @@ export const pollCycleSchema = z
       .optional(),
     breaker: z
       .object({
-        state: z.enum(['closed', 'open', 'half_open']),
+        state: breakerStateSchema,
         nextProbeAt: isoTimestampSchema.nullable(),
       })
       .strict()

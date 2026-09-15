@@ -10,13 +10,16 @@ import {
   splitFrames,
 } from './frame.js';
 import type { Answer, ModbusRequest } from './frame.js';
+import { createTurnaround } from './turnaround.js';
 
 export interface LineServerOptions {
   readonly lineCode: string;
   readonly host: string;
   readonly port: number;
   readonly baud: number;
+  readonly seed: string;
   readonly turnaroundMs: number;
+  readonly turnaroundJitterMs: number;
   readonly busTimeoutMs: number;
   readonly answer: (request: ModbusRequest) => Answer;
   readonly isOnline: () => boolean;
@@ -53,6 +56,12 @@ export const createLineServer = (options: LineServerOptions): LineServer => {
   let queue: Promise<void> = Promise.resolve();
   let timer: NodeJS.Timeout | null = null;
   let syncing = false;
+  const turnaround = createTurnaround({
+    seed: options.seed,
+    lineCode,
+    baseMs: options.turnaroundMs,
+    jitterMs: options.turnaroundJitterMs,
+  });
 
   const serve = async (socket: Socket, request: ModbusRequest): Promise<void> => {
     if (!isAlive(socket)) return;
@@ -64,8 +73,9 @@ export const createLineServer = (options: LineServerOptions): LineServer => {
     }
 
     const frame = replyFrame(request, answer);
+    const turnaroundMs = answer.stallMs > 0 ? options.turnaroundMs : turnaround();
     const exchangeMs =
-      lineTimeMs(RTU_READ_REQUEST_BYTES + rtuBytesOf(frame), options.baud) + options.turnaroundMs;
+      lineTimeMs(RTU_READ_REQUEST_BYTES + rtuBytesOf(frame), options.baud) + turnaroundMs;
     await sleep(exchangeMs + answer.stallMs);
 
     if (isAlive(socket)) socket.write(frame);

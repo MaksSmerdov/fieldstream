@@ -1,0 +1,34 @@
+name: line-blackout
+title: Обрыв линии
+description: >-
+  Порт линии L3 пропадает. Сборщик теряет линию и переподключается по лестнице задержек,
+  приборы линии уходят в offline, соседняя линия L1 работает. После восстановления порта
+  линия и приборы возвращаются без вмешательства.
+timeoutSec: 540
+steps:
+  - inject: { targetKind: line, targetId: L3, kind: offline, ttlSec: 540 }
+  - waitFor:
+      probe: { line: { lineCode: L3, connected: false } }
+      timeoutSec: 15
+  - waitFor:
+      probe: { line: { lineCode: L3, connected: false, reconnectsAtLeast: 3 } }
+      timeoutSec: 30
+  - waitFor:
+      probe: { device: { deviceCode: RC-107, status: offline } }
+      timeoutSec: 120
+  - waitFor:
+      probe: { device: { deviceCode: PM-207, status: offline } }
+      timeoutSec: 120
+  - waitFor:
+      probe: { line: { lineCode: L1, connected: true } }
+      timeoutSec: 15
+  - clear: { targetId: L3, kind: offline }
+  - waitFor:
+      probe: { line: { lineCode: L3, connected: true } }
+      timeoutSec: 45
+  - waitFor:
+      probe: { device: { deviceCode: RC-107, status: online } }
+      timeoutSec: 60
+  - waitFor:
+      probe: { device: { deviceCode: PM-207, status: online } }
+      timeoutSec: 60

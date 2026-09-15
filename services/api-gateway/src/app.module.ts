@@ -9,19 +9,27 @@ import { AuthGuard } from './auth/auth.guard.js';
 import { AuthService } from './auth/auth.service.js';
 import { MeController } from './auth/me.controller.js';
 import type { Env } from './config/env.js';
+import { DlqController } from './dlq/dlq.controller.js';
 import { EventsController } from './events/events.controller.js';
 import { KafkaBridgeService } from './events/kafka-bridge.service.js';
 import { LiveBusService } from './events/live-bus.service.js';
 import { HealthController } from './http/health.controller.js';
 import { MetricsController } from './http/metrics.controller.js';
+import { LabController } from './lab/lab.controller.js';
+import { LineStatusService } from './lab/line-status.service.js';
+import { SimClientService } from './lab/sim-client.service.js';
 import type { GatewayMetrics } from './metrics/metrics.js';
 import { CommandsController } from './commands/commands.controller.js';
 import { OutboxRelayService } from './commands/outbox-relay.service.js';
+import { PipelineController } from './pipeline/pipeline.controller.js';
+import { PipelineSamplerService } from './pipeline/pipeline-sampler.service.js';
 import { ProducerService } from './publish/producer.service.js';
 import { AlarmsController } from './read/alarms.controller.js';
 import { BootController } from './read/boot.controller.js';
 import { DevicesController } from './read/devices.controller.js';
 import { TopologyController } from './read/topology.controller.js';
+import { ScenariosController } from './scenarios/scenarios.controller.js';
+import { ScenariosService } from './scenarios/scenarios.service.js';
 import { DeviceRefsService } from './topology/device-refs.service.js';
 import { CLOCK, ENV, INSTANCE_ID, LOGGER, METRICS, POOL } from './tokens.js';
 
@@ -51,6 +59,10 @@ export class AppModule {
         AlarmsController,
         CommandsController,
         BootController,
+        PipelineController,
+        DlqController,
+        LabController,
+        ScenariosController,
       ],
       providers: [
         { provide: ENV, useValue: deps.env },
@@ -66,6 +78,10 @@ export class AppModule {
         ProducerService,
         OutboxRelayService,
         DeviceRefsService,
+        PipelineSamplerService,
+        LineStatusService,
+        SimClientService,
+        ScenariosService,
       ],
     };
   }

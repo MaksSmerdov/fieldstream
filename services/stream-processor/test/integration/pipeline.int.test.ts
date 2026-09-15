@@ -40,7 +40,7 @@ import { AppModule } from '../../src/app.module.js';
 import { loadEnv } from '../../src/config/env.js';
 import { createMetrics } from '../../src/metrics/metrics.js';
 import type { ProcessorMetrics } from '../../src/metrics/metrics.js';
-import { RAW_GROUP } from '../../src/ingest/raw-consumer.service.js';
+import { INGEST_GROUP } from '../../src/ingest/assignment.js';
 
 const DB_IMAGE = 'timescale/timescaledb-ha:pg16.6-ts2.17.2';
 /** Планировщик TimescaleDB выключен: политики просыпаются посреди теста, а агрегаты тесты обновляют сами. */
@@ -166,7 +166,7 @@ const readingsOf = async (deviceCode: string): Promise<number> => {
 const caughtUp = async (): Promise<boolean> => {
   const [ends, committed] = await Promise.all([
     kafkaAdmin.fetchTopicOffsets(RAW),
-    kafkaAdmin.fetchOffsets({ groupId: RAW_GROUP, topics: [RAW] }),
+    kafkaAdmin.fetchOffsets({ groupId: INGEST_GROUP, topics: [RAW] }),
   ]);
   const byPartition = new Map(
     (committed[0]?.partitions ?? []).map((item) => [item.partition, item.offset]),
@@ -212,6 +212,7 @@ const startProcessor = async (): Promise<Running> => {
       clock: SystemClock,
       metrics,
       pool,
+      instanceId: 'pipeline',
     }),
     new FastifyAdapter(),
     { logger: false },
@@ -342,7 +343,7 @@ describe('процессор на настоящих Kafka и TimescaleDB', () =
     await waitFor('смещения подтверждены', caughtUp);
     await stopProcessor(first);
 
-    await kafkaAdmin.resetOffsets({ groupId: RAW_GROUP, topic: RAW, earliest: true });
+    await kafkaAdmin.resetOffsets({ groupId: INGEST_GROUP, topic: RAW, earliest: true });
     expect(await caughtUp()).toBe(false);
 
     const second = await startProcessor();
@@ -387,7 +388,7 @@ describe('процессор на настоящих Kafka и TimescaleDB', () =
     expect(invalid?.key?.toString()).toBe('RC-102');
     expect(invalid?.value?.equals(broken)).toBe(true);
     expect(headerText(invalid?.headers, KAFKA_HEADERS.dlqOriginTopic)).toBe(RAW);
-    expect(headerText(invalid?.headers, KAFKA_HEADERS.dlqConsumerGroup)).toBe(RAW_GROUP);
+    expect(headerText(invalid?.headers, KAFKA_HEADERS.dlqConsumerGroup)).toBe(INGEST_GROUP);
     expect(headerText(invalid?.headers, KAFKA_HEADERS.traceId)).toBe('poison');
     expect(byClass.get('unknown_device')?.key?.toString()).toBe('RC-999');
     expect(rows.rows).toEqual([
@@ -397,7 +398,7 @@ describe('процессор на настоящих Kafka и TimescaleDB', () =
   });
 
   /**
-   * Состояние алармов живёт в памяти процесса. Без восстановления при запуске эпизод,
+   * Состояние алармов живёт в памяти процесса. Без восстановления при назначении партиций эпизод,
    * открытый до перезапуска, не был бы снят никогда: движок не знает, что он поднят,
    * а счётчик активных алармов на экранах врал бы до ручного вмешательства.
    */

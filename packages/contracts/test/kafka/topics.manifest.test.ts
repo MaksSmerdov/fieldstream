@@ -13,6 +13,7 @@ interface TopicShape {
   readonly retentionMs: number | null;
   readonly configs?: Readonly<Record<string, string>>;
   readonly owner: string;
+  readonly redriver?: string;
   readonly why: string;
 }
 
@@ -50,6 +51,38 @@ const SAMPLES: { readonly [K in TopicKey]: PayloadOf<K> } = {
     requestCount: 2,
     planMode: 'merged',
     traceId: TRACE_ID,
+  },
+  lineStatus: {
+    schema: 'line.status',
+    v: 1,
+    ts: TS,
+    lineCode: 'L1',
+    running: true,
+    connected: true,
+    planMode: 'merged',
+    pollIntervalMs: 10_000,
+    requestTimeoutMs: 600,
+    hardTimeoutMs: 1_450,
+    watchdog: { limitMs: 300_000, cycleStartedAt: TS, trips: 0 },
+    lastCycle: { at: TS, outcome: 'polled', durationMs: 420, polled: 6, failed: 1 },
+    reconnects: [{ attempt: 0, at: TS, baseMs: 1_000, jitterMs: -40, chosenMs: 960 }],
+    devices: [
+      {
+        deviceCode: 'RC-105',
+        slaveId: 5,
+        breaker: { state: 'open', failures: 2, probeDelayMs: 30_000, nextProbeAt: TS },
+      },
+    ],
+    latency: {
+      bucketsMs: [50, 100, 200],
+      counts: [10, 30, 2, 0],
+      samples: 42,
+      timeouts: 3,
+      p50Ms: 64,
+      p95Ms: 140,
+      p99Ms: 180,
+      suggestedTimeoutMs: 900,
+    },
   },
   telemetryReadings: {
     schema: 'telemetry.reading',
@@ -120,12 +153,12 @@ const SAMPLES: { readonly [K in TopicKey]: PayloadOf<K> } = {
 describe('манифест топиков', () => {
   it('имя топика непустое, с префиксом системы и версией схемы', () => {
     const wrong = SPECS.map((spec) => spec.name).filter(
-      (name) => !/^fieldstream\.[a-z0-9]+(\.[a-z0-9]+)*\.v1$/.test(name),
+      (name) => !/^fieldstream\.[a-z0-9]+(\.[a-z0-9]+)*\.v[1-9]\d*$/.test(name),
     );
 
     expect(wrong).toEqual([]);
     expect(SPECS.every((spec) => spec.name.startsWith('fieldstream.'))).toBe(true);
-    expect(SPECS.every((spec) => spec.name.endsWith('.v1'))).toBe(true);
+    expect(SPECS.every((spec) => /\.v[1-9]\d*$/.test(spec.name))).toBe(true);
   });
 
   it('имена топиков уникальны и совпадают со списком TOPIC_NAMES', () => {
@@ -145,6 +178,21 @@ describe('манифест топиков', () => {
     expect(foreign).toEqual([]);
     expect(TOPICS.telemetryRaw.owner).toBe('edge-collector');
     expect(TOPICS.telemetryReadings.owner).toBe('stream-processor');
+  });
+
+  it('повторно подаёт в топик только сервис из числа писателей и не сам владелец', () => {
+    const redrivable = SPECS.filter((spec) => spec.redriver !== undefined);
+    const foreign = redrivable
+      .filter((spec) => !WRITERS.includes(spec.redriver ?? ''))
+      .map((spec) => spec.name);
+    const selfRedrive = redrivable
+      .filter((spec) => spec.redriver === spec.owner)
+      .map((spec) => spec.name);
+
+    expect(foreign).toEqual([]);
+    expect(selfRedrive).toEqual([]);
+    expect(TOPICS.telemetryRaw.redriver).toBe('stream-processor');
+    expect(redrivable.map((spec) => spec.name)).toEqual([TOPICS.telemetryRaw.name]);
   });
 
   it('у компактируемого топика состояния нет retention, у остальных он задан', () => {
@@ -185,6 +233,13 @@ describe('манифест топиков', () => {
   it('пример payload проходит схему своего топика', () => {
     expect(TOPICS.telemetryRaw.schema.safeParse(SAMPLES.telemetryRaw).success).toBe(true);
     expect(TOPICS.pollCycles.schema.safeParse(SAMPLES.pollCycles).success).toBe(true);
+    expect(TOPICS.lineStatus.schema.safeParse(SAMPLES.lineStatus).success).toBe(true);
+    expect(
+      TOPICS.lineStatus.schema.safeParse({
+        ...SAMPLES.lineStatus,
+        latency: { ...SAMPLES.lineStatus.latency, counts: [10, 30, 2] },
+      }).success,
+    ).toBe(false);
     expect(TOPICS.telemetryReadings.schema.safeParse(SAMPLES.telemetryReadings).success).toBe(true);
     expect(TOPICS.deviceState.schema.safeParse(SAMPLES.deviceState).success).toBe(true);
     expect(TOPICS.alarmEvents.schema.safeParse(SAMPLES.alarmEvents).success).toBe(true);
@@ -202,7 +257,17 @@ describe('манифест топиков', () => {
     ];
 
     expect(keys.filter((key) => key.length === 0)).toEqual([]);
-    expect(keys).toEqual(['RC-101', 'L1', 'RC-101', 'RC-101', 'RC-101']);
+    expect(keys).toEqual(['RC-101', 'RC-101', 'RC-101', 'RC-101', 'RC-101']);
+  });
+
+  it('у сырых кадров и циклов одинаковое число партиций и ключ одного вида', () => {
+    const frame = { ...SAMPLES.telemetryRaw, deviceCode: 'PM-207', lineCode: 'L3' };
+    const cycle = { ...SAMPLES.pollCycles, deviceCode: 'PM-207', lineCode: 'L3' };
+
+    expect(TOPICS.pollCycles.partitions).toBe(TOPICS.telemetryRaw.partitions);
+    expect(TOPICS.telemetryRaw.keyOf(frame)).toBe(frame.deviceCode);
+    expect(TOPICS.pollCycles.keyOf(cycle)).toBe(cycle.deviceCode);
+    expect(TOPICS.pollCycles.keyOf(cycle)).toBe(TOPICS.telemetryRaw.keyOf(frame));
   });
 
   it('ключ компактируемого топика это идентификатор прибора', () => {

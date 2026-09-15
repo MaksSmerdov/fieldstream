@@ -72,4 +72,42 @@ describe('журнал поломок', () => {
     expect(book.clear()).toBe(2);
     expect(book.list()).toEqual([]);
   });
+
+  it('clear с фильтром снимает только подходящие поломки по цели и виду', () => {
+    const book = createFaultBook(createFakeClock(0));
+    book.add(request({ targetKind: 'line', targetId: 'L1', kind: 'crc' }), null);
+    book.add(request({ targetKind: 'device', targetId: 'RC-101', kind: 'crc' }), null);
+    book.add(request({ targetKind: 'device', targetId: 'RC-101', kind: 'silent' }), null);
+    book.add(request({ targetKind: 'device', targetId: 'RC-102', kind: 'silent' }), null);
+    const remaining = (): string[] => book.list().map((fault) => `${fault.targetId}:${fault.kind}`);
+
+    expect(book.clear({ targetId: 'RC-101', kind: 'silent' })).toBe(1);
+    expect(remaining()).toEqual(['L1:crc', 'RC-101:crc', 'RC-102:silent']);
+    expect(book.clear({ kind: 'silent' })).toBe(1);
+    expect(book.clear({ targetId: 'L2' })).toBe(0);
+    expect(remaining()).toEqual(['L1:crc', 'RC-101:crc']);
+  });
+
+  it('фильтр по прибору не трогает поломки его линии, фильтр по линии не трогает её приборы', () => {
+    const book = createFaultBook(createFakeClock(0));
+    book.add(request({ targetKind: 'line', targetId: 'L1', kind: 'stall' }), null);
+    book.add(request({ targetKind: 'device', targetId: 'RC-101', kind: 'stall' }), null);
+
+    expect(book.clear({ targetId: 'RC-101' })).toBe(1);
+    expect(book.affecting('L1', 'RC-101').map((fault) => fault.targetId)).toEqual(['L1']);
+
+    book.add(request({ targetKind: 'device', targetId: 'RC-101', kind: 'stall' }), null);
+    expect(book.clear({ targetId: 'L1' })).toBe(1);
+    expect(book.affecting('L1', 'RC-101').map((fault) => fault.targetId)).toEqual(['RC-101']);
+  });
+
+  it('истёкшие поломки в число снятых не входят', () => {
+    const clock = createFakeClock(0);
+    const book = createFaultBook(clock);
+    book.add(request({ targetKind: 'line', targetId: 'L1', kind: 'crc', ttlSec: 10 }), null);
+    book.add(request({ targetKind: 'line', targetId: 'L1', kind: 'stall', ttlSec: 60 }), null);
+    clock.advance(10_000);
+
+    expect(book.clear({ targetId: 'L1' })).toBe(1);
+  });
 });

@@ -73,7 +73,7 @@ describe('groupByTopic', () => {
 
     expect(groups.map((group) => group.topic)).toEqual([
       'fieldstream.telemetry.raw.v1',
-      'fieldstream.collector.cycles.v1',
+      'fieldstream.collector.cycles.v2',
     ]);
     expect(groups[0]?.messages.map((message) => message.key)).toEqual(['RC-101', 'RC-102']);
   });

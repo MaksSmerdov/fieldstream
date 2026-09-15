@@ -1,0 +1,47 @@
+name: gateway-down
+title: Отказ шлюза
+description: >-
+  Шлюз GW-02 теряет обе свои линии, L3 и L4. Их приборы уходят в offline, а линии шлюза
+  GW-01 и их приборы продолжают работать. После восстановления всё возвращается на связь.
+timeoutSec: 660
+steps:
+  - inject: { targetKind: line, targetId: L3, kind: offline, ttlSec: 660 }
+  - inject: { targetKind: line, targetId: L4, kind: offline, ttlSec: 660 }
+  - waitFor:
+      probe: { line: { lineCode: L3, connected: false } }
+      timeoutSec: 15
+  - waitFor:
+      probe: { line: { lineCode: L4, connected: false } }
+      timeoutSec: 15
+  - waitFor:
+      probe: { device: { deviceCode: RC-107, status: offline } }
+      timeoutSec: 120
+  - waitFor:
+      probe: { device: { deviceCode: RC-110, status: offline } }
+      timeoutSec: 120
+  - waitFor:
+      probe: { line: { lineCode: L1, connected: true } }
+      timeoutSec: 15
+  - waitFor:
+      probe: { line: { lineCode: L2, connected: true } }
+      timeoutSec: 15
+  - waitFor:
+      probe: { device: { deviceCode: RC-101, status: online } }
+      timeoutSec: 15
+  - waitFor:
+      probe: { device: { deviceCode: RC-104, status: online } }
+      timeoutSec: 15
+  - clear: { targetId: L3, kind: offline }
+  - clear: { targetId: L4, kind: offline }
+  - waitFor:
+      probe: { line: { lineCode: L3, connected: true } }
+      timeoutSec: 45
+  - waitFor:
+      probe: { line: { lineCode: L4, connected: true } }
+      timeoutSec: 45
+  - waitFor:
+      probe: { device: { deviceCode: RC-107, status: online } }
+      timeoutSec: 60
+  - waitFor:
+      probe: { device: { deviceCode: RC-110, status: online } }
+      timeoutSec: 60

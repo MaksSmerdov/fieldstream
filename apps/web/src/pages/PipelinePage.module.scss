@@ -1,0 +1,29 @@
+.pipeline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  min-width: 0;
+
+  &__section {
+    margin-bottom: 16px;
+  }
+
+  &__heading {
+    margin-bottom: 8px;
+  }
+
+  &__groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+    align-items: start;
+    gap: 16px;
+  }
+
+  &__pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+    align-items: start;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+}

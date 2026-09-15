@@ -38,10 +38,15 @@ log.info(
 );
 log.info(
   {
-    consumes: [TOPICS.telemetryReadings.name, TOPICS.deviceState.name, TOPICS.alarmEvents.name],
+    consumes: [
+      TOPICS.telemetryReadings.name,
+      TOPICS.deviceState.name,
+      TOPICS.alarmEvents.name,
+      TOPICS.lineStatus.name,
+    ],
     produces: [TOPICS.deviceCommands.name],
   },
-  'читает показания, состояние и алармы, пишет команды через очередь исходящих',
+  'читает показания, состояние, алармы и снимки линий, пишет команды через очередь исходящих',
 );
 log.info({ port: env.GATEWAY_HTTP_PORT }, 'GET /health/live, /health/ready, /metrics, /api/events');
 

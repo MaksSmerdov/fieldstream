@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { simFaultSchema, simStateSchema } from '@fieldstream/contracts';
+import { simClearFaultsResultSchema, simFaultSchema, simStateSchema } from '@fieldstream/contracts';
+import type { SimFaultRequestInput } from '@fieldstream/contracts';
 import { DEMO_STAND } from '@fieldstream/device-profiles';
 import { createFakeClock } from '@fieldstream/domain';
 import type { FastifyInstance } from 'fastify';
@@ -20,6 +21,28 @@ const makeApp = (): FastifyInstance => {
   apps.push(app);
   return app;
 };
+
+const SEEDED_FAULTS: readonly SimFaultRequestInput[] = [
+  { targetKind: 'line', targetId: 'L1', kind: 'crc' },
+  { targetKind: 'device', targetId: 'RC-101', kind: 'crc' },
+  { targetKind: 'device', targetId: 'RC-101', kind: 'silent' },
+  { targetKind: 'device', targetId: 'RC-102', kind: 'silent' },
+];
+
+/** Стенд с поломками на линии L1 и двух её приборах. */
+const makeAppWithFaults = async (): Promise<FastifyInstance> => {
+  const app = makeApp();
+  for (const payload of SEEDED_FAULTS) {
+    await app.inject({ method: 'POST', url: '/sim/fault', payload });
+  }
+  return app;
+};
+
+/** Действующие поломки стенда в виде "цель:вид". */
+const faultsLeft = async (app: FastifyInstance): Promise<string[]> =>
+  simStateSchema
+    .parse((await app.inject({ method: 'GET', url: '/sim/state' })).json<unknown>())
+    .faults.map((fault) => `${fault.targetId}:${fault.kind}`);
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
@@ -98,20 +121,74 @@ describe('Chaos API', () => {
     expect(response.json<unknown>()).toEqual({ action: 'defrost_started', deviceCode: 'RC-103' });
   });
 
-  it('DELETE /sim/faults снимает все поломки', async () => {
-    const app = makeApp();
-    await app.inject({
-      method: 'POST',
-      url: '/sim/fault',
-      payload: { targetKind: 'line', targetId: 'L1', kind: 'crc' },
-    });
-    const removed = await app.inject({ method: 'DELETE', url: '/sim/faults' });
-    const state = simStateSchema.parse(
-      (await app.inject({ method: 'GET', url: '/sim/state' })).json<unknown>(),
-    );
+  it('DELETE /sim/faults без фильтра снимает все поломки и отвечает 200 с их числом', async () => {
+    const app = await makeAppWithFaults();
+    const response = await app.inject({ method: 'DELETE', url: '/sim/faults' });
 
-    expect(removed.statusCode).toBe(204);
-    expect(state.faults).toEqual([]);
+    expect(response.statusCode).toBe(200);
+    expect(simClearFaultsResultSchema.parse(response.json<unknown>())).toEqual({ removed: 4 });
+    expect(await faultsLeft(app)).toEqual([]);
+  });
+
+  it('фильтр по прибору снимает только его поломки, поломка линии остаётся', async () => {
+    const app = await makeAppWithFaults();
+    const response = await app.inject({ method: 'DELETE', url: '/sim/faults?targetId=RC-101' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<unknown>()).toEqual({ removed: 2 });
+    expect(await faultsLeft(app)).toEqual(['L1:crc', 'RC-102:silent']);
+  });
+
+  it('фильтр по линии не трогает поломки, внесённые на её приборы', async () => {
+    const app = await makeAppWithFaults();
+    const response = await app.inject({ method: 'DELETE', url: '/sim/faults?targetId=L1' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<unknown>()).toEqual({ removed: 1 });
+    expect(await faultsLeft(app)).toEqual(['RC-101:crc', 'RC-101:silent', 'RC-102:silent']);
+  });
+
+  it('фильтр по виду снимает этот вид на всех целях', async () => {
+    const app = await makeAppWithFaults();
+    const response = await app.inject({ method: 'DELETE', url: '/sim/faults?kind=silent' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<unknown>()).toEqual({ removed: 2 });
+    expect(await faultsLeft(app)).toEqual(['L1:crc', 'RC-101:crc']);
+  });
+
+  it('цель и вид вместе снимают только их пересечение', async () => {
+    const app = await makeAppWithFaults();
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/sim/faults?targetId=RC-101&kind=silent',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<unknown>()).toEqual({ removed: 1 });
+    expect(await faultsLeft(app)).toEqual(['L1:crc', 'RC-101:crc', 'RC-102:silent']);
+  });
+
+  it('неверный фильтр даёт 400 в формате problem+json и ничего не снимает', async () => {
+    const app = await makeAppWithFaults();
+
+    for (const [query, path] of [
+      ['targetId=RC-1', 'targetId'],
+      ['kind=meteor', 'kind'],
+      ['lineCode=L1', ''],
+      ['targetId=L1&targetId=L2', 'targetId'],
+    ]) {
+      const response = await app.inject({ method: 'DELETE', url: `/sim/faults?${query}` });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.headers['content-type']).toContain('application/problem+json');
+      expect(response.json<unknown>()).toMatchObject({
+        status: 400,
+        title: 'Неверный запрос',
+        issues: [{ path, message: expect.any(String) as unknown }],
+      });
+    }
+    expect(await faultsLeft(app)).toHaveLength(4);
   });
 
   it('сценарий запускается по имени, неизвестный сценарий даёт 404', async () => {

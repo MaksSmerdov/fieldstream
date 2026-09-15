@@ -104,6 +104,8 @@ beforeAll(async () => {
       FS_API_PASSWORD: 'тест',
       AUTH_SECRET: SECRET,
       SSE_BRIDGE: 'off',
+      PIPELINE_SAMPLER: 'off',
+      COLLECTOR_STATUS: 'off',
       SSE_PING_MS: '60000',
       SSE_RING_SIZE: '100',
     }),

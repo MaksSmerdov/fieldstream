@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { BeforeApplicationShutdown, OnApplicationBootstrap } from '@nestjs/common';
-import type { Consumer, EachBatchPayload, KafkaMessage } from 'kafkajs';
+import type { EachBatchPayload, KafkaMessage } from 'kafkajs';
 import type pg from 'pg';
 import { TOPICS } from '@fieldstream/contracts';
 import type { TelemetryReading } from '@fieldstream/contracts';
@@ -9,11 +8,17 @@ import {
   insertAlarmEvents,
   insertDeviceEvents,
   insertReadings,
-  loadOpenAlarmEpisodes,
   recordDlqMessages,
+  resolveDlqCopies,
   withTransaction,
 } from '@fieldstream/db';
-import type { DeviceEventRow, DlqRow, OpenAlarmEpisode, ReadingRow } from '@fieldstream/db';
+import type {
+  DeviceEventRow,
+  DlqCopy,
+  DlqRow,
+  OpenAlarmEpisode,
+  ReadingRow,
+} from '@fieldstream/db';
 import { toIsoTimestamp } from '@fieldstream/domain';
 import type {
   Clock,
@@ -23,12 +28,12 @@ import type {
 } from '@fieldstream/domain';
 import {
   commitThrough,
-  createConsumer,
   decodeMessage,
   headerText,
+  readDlqHistory,
   toDlqMessage,
 } from '@fieldstream/kafka';
-import type { RawOutgoingMessage } from '@fieldstream/kafka';
+import type { DlqHistory, RawOutgoingMessage } from '@fieldstream/kafka';
 import type { Logger } from '@fieldstream/nest-common';
 import { AlarmRulesService } from '../alarms/alarm-rules.service.js';
 import { HealthService } from '../health/health.service.js';
@@ -44,14 +49,19 @@ import {
   toOutcome,
 } from './alarms.js';
 import type { AlarmOutcome } from './alarms.js';
-import { processFrame } from './frame.js';
+import { INGEST_GROUP } from './assignment.js';
+import { filterKey, processFrame } from './frame.js';
+import type { SpikeMemory } from './frame.js';
 
-export const RAW_GROUP = 'fs-processor';
 const MAX_ATTEMPTS = 5;
 const BACKOFF_MS = [200, 500, 1_000, 2_500, 5_000] as const;
 
+/** Возвращённый из очереди кадр проходит фильтр скачков с чистого листа, а не по свежим значениям. */
+const NO_FILTERS: SpikeMemory = new Map();
+
 interface Poisoned {
   readonly message: KafkaMessage;
+  readonly history: DlqHistory;
   readonly errorClass: string;
   readonly error: string;
 }
@@ -73,18 +83,23 @@ const textHeaders = (message: KafkaMessage): Record<string, string> => {
 };
 
 /**
- * Потребитель сырых кадров. Порядок строгий: разбор всей пачки, одна транзакция с показаниями
+ * Обработчик пачек сырых кадров. Порядок строгий: разбор всей пачки, одна транзакция с показаниями
  * и событиями, отправка ядовитых сообщений в очередь недоставленных, публикация показаний,
  * и только потом подтверждение смещения. Падение между записью и подтверждением даёт повтор,
  * а повтор ничего не меняет: ключи идемпотентности лежат в схеме базы.
+ * Фильтры скачков и алармы в памяти только по своим приборам: при ребалансе отобранные
+ * забываются, а новые приходят вместе с открытыми эпизодами из базы.
+ * Кадр, возвращённый из очереди недоставленных, старше всего, что уже видено по прибору: он только
+ * дописывает показания в базу и не трогает память, события, алармы и живой канал. Копия с номером
+ * строки очереди закрывает эту строку в той же транзакции, чем бы ни кончился её разбор, если
+ * топик и ключ строки совпадают с копией.
  */
 @Injectable()
-export class RawConsumerService implements OnApplicationBootstrap, BeforeApplicationShutdown {
-  private readonly consumer: Consumer;
+export class RawBatchService {
   private readonly attempts = new Map<number, number>();
-  private filters = new Map<string, SpikeFilterState>();
-  private alarms = new Map<string, DeviceAlarmState>();
-  private running = false;
+  private readonly owned = new Set<string>();
+  private readonly filters = new Map<string, SpikeFilterState>();
+  private readonly alarms = new Map<string, DeviceAlarmState>();
 
   public constructor(
     @Inject(LOGGER) private readonly log: Logger,
@@ -95,78 +110,48 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
     private readonly refs: DeviceRefsService,
     private readonly rules: AlarmRulesService,
     private readonly health: HealthService,
-  ) {
-    this.consumer = createConsumer(producer.kafka, RAW_GROUP);
-  }
+  ) {}
 
-  public onApplicationBootstrap(): void {
-    void this.start();
-  }
-
-  public async beforeApplicationShutdown(): Promise<void> {
-    this.running = false;
-    await this.consumer.disconnect();
-  }
-
-  public isRunning(): boolean {
-    return this.running;
-  }
-
-  private async start(): Promise<void> {
-    await this.restoreOpenAlarms();
-    await this.consumer.connect();
-    await this.consumer.subscribe({ topic: TOPICS.telemetryRaw.name, fromBeginning: true });
-    await this.consumer.run({
-      autoCommit: false,
-      eachBatchAutoResolve: false,
-      eachBatch: (payload) => this.handleBatch(payload),
-    });
-    this.running = true;
+  /** Забывает отобранные приборы: их фильтры и алармы теперь ведёт другой экземпляр. */
+  public release(deviceCodes: readonly string[]): void {
+    for (const deviceCode of deviceCodes) {
+      this.owned.delete(deviceCode);
+      this.forget(deviceCode);
+    }
   }
 
   /**
-   * Поднятые эпизоды из базы в память. Состояние алармов живёт в памяти процесса, поэтому
-   * после перезапуска движок не знал бы, что эпизод открыт, и никогда бы его не снял:
-   * счётчик активных алармов на экранах врал бы до ручного вмешательства.
+   * Принимает новые приборы. Фильтры скачков начинаются с чистого листа, а поднятые эпизоды
+   * возвращаются в память: иначе движок не знал бы, что эпизод открыт, и никогда бы его не снял,
+   * а счётчик активных алармов на экранах врал бы до ручного вмешательства.
    */
-  private async restoreOpenAlarms(): Promise<void> {
-    try {
-      const open = await this.readOpenAlarms();
-      const memory = new Map<string, Record<string, MetricAlarmState>>();
+  public adopt(deviceCodes: readonly string[], episodes: readonly OpenAlarmEpisode[]): void {
+    const adopted = new Set(deviceCodes);
+    const memory = new Map<string, Record<string, MetricAlarmState>>();
 
-      for (const episode of open) {
-        if (episode.threshold === null) continue;
-        const device = memory.get(episode.deviceCode) ?? {};
-        device[episode.metricKey] = {
-          raised: true,
-          boundary: episode.boundary,
-          severity: episode.severity,
-          threshold: episode.threshold,
-          raisedAt: episode.raisedAtMs,
-          mode: episode.mode,
-        };
-        memory.set(episode.deviceCode, device);
-      }
-
-      this.alarms = new Map(memory);
-      if (open.length > 0)
-        this.log.info({ episodes: open.length }, 'открытые алармы восстановлены');
-    } catch (error) {
-      // Восстановление не обязано удаваться: без него алармы просто поднимутся заново
-      this.log.warn({ err: error }, 'открытые алармы восстановить не удалось');
+    for (const deviceCode of adopted) {
+      this.owned.add(deviceCode);
+      this.forget(deviceCode);
     }
+
+    for (const episode of episodes) {
+      if (!adopted.has(episode.deviceCode) || episode.threshold === null) continue;
+      const device = memory.get(episode.deviceCode) ?? {};
+      device[episode.metricKey] = {
+        raised: true,
+        boundary: episode.boundary,
+        severity: episode.severity,
+        threshold: episode.threshold,
+        raisedAt: episode.raisedAtMs,
+        mode: episode.mode,
+      };
+      memory.set(episode.deviceCode, device);
+    }
+
+    for (const [deviceCode, device] of memory) this.alarms.set(deviceCode, device);
   }
 
-  private async readOpenAlarms(): Promise<OpenAlarmEpisode[]> {
-    const client = await this.pool.connect();
-    try {
-      return await loadOpenAlarmEpisodes(client);
-    } finally {
-      client.release();
-    }
-  }
-
-  private async handleBatch(payload: EachBatchPayload): Promise<void> {
+  public async handle(payload: EachBatchPayload): Promise<void> {
     const { batch } = payload;
     if (!this.refs.isLoaded()) {
       this.pauseFor(payload, 1, 'топология ещё не загружена');
@@ -176,39 +161,58 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
     const startedAt = this.clock.now();
     const filters = new Map(this.filters);
     const alarms = new Map(this.alarms);
+    const touched = new Set<string>();
+    const frames = this.health.draftFrames();
     const alarmOutcomes: AlarmOutcome[] = [];
     const rows: ReadingRow[] = [];
     const readings: TelemetryReading[] = [];
     const events: DeviceEventRow[] = [];
     const poisoned: Poisoned[] = [];
+    const redelivered: DlqCopy[] = [];
+    let replayed = 0;
     let lastOffset: string | null = null;
 
     for (const message of batch.messages) {
       if (!payload.isRunning() || payload.isStale()) break;
       lastOffset = message.offset;
+      const history = readDlqHistory(message.headers);
+      if (history.redriveOf !== null) {
+        redelivered.push({
+          id: history.redriveOf,
+          sourceTopic: batch.topic,
+          key: message.key?.toString('utf8') ?? null,
+        });
+      }
 
       const decoded = decodeMessage(TOPICS.telemetryRaw, message.value, message.headers);
       if (!decoded.ok) {
-        poisoned.push({ message, errorClass: decoded.errorClass, error: decoded.error });
+        poisoned.push({ message, history, errorClass: decoded.errorClass, error: decoded.error });
         continue;
       }
 
+      const replay = history.attempts > 0 || history.redriveOf !== null;
       const outcome = processFrame(decoded.payload, {
         refs: this.refs.current(),
-        filters,
+        filters: replay ? NO_FILTERS : filters,
         source: { partition: batch.partition, offset: message.offset },
       });
       if (outcome.kind === 'rejected') {
-        poisoned.push({ message, errorClass: outcome.errorClass, error: outcome.error });
+        poisoned.push({ message, history, errorClass: outcome.errorClass, error: outcome.error });
+        continue;
+      }
+      if (replay) {
+        rows.push(...outcome.rows);
+        replayed += 1;
         continue;
       }
 
       for (const [key, state] of outcome.filters) filters.set(key, state);
+      touched.add(outcome.observation.deviceCode);
       rows.push(...outcome.rows);
       readings.push(outcome.reading);
       const deviceId = this.refs.current().get(outcome.observation.deviceCode)?.deviceId;
       if (deviceId !== undefined) {
-        for (const event of this.health.observeFrame(outcome.observation)) {
+        for (const event of frames.observe(outcome.observation)) {
           events.push({ deviceId, event });
         }
 
@@ -228,8 +232,13 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
 
     if (lastOffset === null) return;
 
-    const failedAt = toIsoTimestamp(this.clock.now());
-    const dlqMessages: RawOutgoingMessage[] = poisoned.map((item) =>
+    const handledAt = toIsoTimestamp(this.clock.now());
+    const failures = poisoned.map((item) => ({
+      item,
+      attempt: item.history.attempts + 1,
+      firstFailedAt: item.history.firstFailedAt ?? handledAt,
+    }));
+    const dlqMessages: RawOutgoingMessage[] = failures.map(({ item, attempt, firstFailedAt }) =>
       toDlqMessage(
         TOPICS.telemetryRawDlq,
         {
@@ -244,14 +253,14 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
         {
           errorClass: item.errorClass,
           error: item.error,
-          consumerGroup: RAW_GROUP,
-          attempt: 1,
-          firstFailedAt: failedAt,
+          consumerGroup: INGEST_GROUP,
+          attempt,
+          firstFailedAt,
         },
         PRODUCER_NAME,
       ),
     );
-    const dlqRows: DlqRow[] = poisoned.map((item) => ({
+    const dlqRows: DlqRow[] = failures.map(({ item, attempt, firstFailedAt }) => ({
       sourceTopic: batch.topic,
       partition: batch.partition,
       offset: item.message.offset,
@@ -260,6 +269,9 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
       payload: item.message.value,
       errorClass: item.errorClass,
       error: item.error,
+      attempts: attempt,
+      firstSeen: firstFailedAt,
+      redriveOf: item.history.redriveOf,
     }));
 
     const raised = alarmOutcomes.filter((item) => item.transition.state === 'raised');
@@ -272,6 +284,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
         await insertAlarmEvents(client, raised.map(raisedRowOf));
         await clearAlarmEvents(client, cleared.map(clearedRowOf));
         await recordDlqMessages(client, dlqRows);
+        await resolveDlqCopies(client, redelivered, handledAt);
         return count;
       });
       await this.producer.sendRaw(dlqMessages);
@@ -285,7 +298,7 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
       ]);
 
       this.metrics.observeRows('readings', inserted);
-      this.metrics.observeFrames('accepted', readings.length);
+      this.metrics.observeFrames('accepted', readings.length + replayed);
       if (raised.length > 0) this.metrics.observeAlarms('raised', raised.length);
       if (cleared.length > 0) this.metrics.observeAlarms('cleared', cleared.length);
       for (const item of poisoned) {
@@ -317,11 +330,42 @@ export class RawConsumerService implements OnApplicationBootstrap, BeforeApplica
     }
 
     this.attempts.delete(batch.partition);
-    this.filters = filters;
-    this.alarms = alarms;
+    this.remember(filters, alarms, touched);
+    frames.commit();
     await commitThrough(payload, lastOffset);
     await payload.heartbeat();
     this.metrics.observeBatch(batch.topic, this.clock.now() - startedAt);
+  }
+
+  /**
+   * Переносит в память итог записанной пачки. Только по приборам из пачки и только если они
+   * всё ещё свои: ребаланс посреди пачки не должен оживить отобранный прибор или затереть
+   * эпизоды, восстановленные для нового.
+   */
+  private remember(
+    filters: ReadonlyMap<string, SpikeFilterState>,
+    alarms: ReadonlyMap<string, DeviceAlarmState>,
+    touched: ReadonlySet<string>,
+  ): void {
+    for (const deviceCode of touched) {
+      if (!this.owned.has(deviceCode)) continue;
+
+      const prefix = filterKey(deviceCode, '');
+      for (const [key, state] of filters) {
+        if (key.startsWith(prefix)) this.filters.set(key, state);
+      }
+      const alarm = alarms.get(deviceCode);
+      if (alarm !== undefined) this.alarms.set(deviceCode, alarm);
+    }
+  }
+
+  /** Убирает из памяти фильтры скачков и алармы прибора. */
+  private forget(deviceCode: string): void {
+    this.alarms.delete(deviceCode);
+    const prefix = filterKey(deviceCode, '');
+    for (const key of [...this.filters.keys()]) {
+      if (key.startsWith(prefix)) this.filters.delete(key);
+    }
   }
 
   /** Пауза партиции без подтверждения смещения: после неё kafkajs отдаст ту же пачку заново. */

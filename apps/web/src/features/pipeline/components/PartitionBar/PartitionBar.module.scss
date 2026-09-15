@@ -1,0 +1,126 @@
+.bar {
+  position: relative;
+  width: 100%;
+  height: 14px;
+  overflow: hidden;
+  border: 1px solid var(--mui-palette-divider);
+  border-radius: 4px;
+  background: var(--mui-palette-action-hover);
+
+  &_uncommitted {
+    border-style: dashed;
+    background: transparent;
+  }
+
+  &_empty {
+    border-color: var(--mui-palette-text-disabled);
+    background: transparent;
+  }
+
+  &__read {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    opacity: 0.55;
+  }
+
+  &__lag {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+  }
+
+  &__commit {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--mui-palette-text-primary);
+  }
+
+  &__read_tone0 {
+    background: var(--mui-palette-primary-main);
+  }
+
+  &__read_tone1 {
+    background: var(--mui-palette-success-main);
+  }
+
+  &__read_tone2 {
+    background: var(--mui-palette-secondary-main);
+  }
+
+  &__read_tone3 {
+    background: var(--mui-palette-info-main);
+  }
+
+  &__read_tone4 {
+    background: var(--mui-palette-warning-main);
+  }
+
+  &__read_tone5 {
+    background: var(--mui-palette-text-primary);
+  }
+
+  &__read_none {
+    background: var(--mui-palette-text-disabled);
+  }
+
+  &__lag_tone0 {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--mui-palette-primary-main) 0 2px,
+      transparent 2px 6px
+    );
+  }
+
+  &__lag_tone1 {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--mui-palette-success-main) 0 2px,
+      transparent 2px 6px
+    );
+  }
+
+  &__lag_tone2 {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--mui-palette-secondary-main) 0 2px,
+      transparent 2px 6px
+    );
+  }
+
+  &__lag_tone3 {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--mui-palette-info-main) 0 2px,
+      transparent 2px 6px
+    );
+  }
+
+  &__lag_tone4 {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--mui-palette-warning-main) 0 2px,
+      transparent 2px 6px
+    );
+  }
+
+  &__lag_tone5 {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--mui-palette-text-primary) 0 2px,
+      transparent 2px 6px
+    );
+  }
+
+  &__lag_none {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--mui-palette-text-disabled) 0 2px,
+      transparent 2px 6px
+    );
+  }
+}

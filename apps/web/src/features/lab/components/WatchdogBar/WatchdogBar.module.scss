@@ -1,0 +1,104 @@
+@mixin fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 1s linear;
+}
+
+@mixin note {
+  display: block;
+  min-height: 40px;
+}
+
+.watchdog {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 12px 14px;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 32px;
+  }
+
+  &__trips {
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__empty {
+    min-height: 90px;
+  }
+
+  &__line {
+    min-height: 20px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__track {
+    position: relative;
+    height: 12px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--mui-palette-action-hover);
+  }
+
+  &__fill_normal {
+    @include fill;
+
+    background: var(--mui-palette-success-main);
+  }
+
+  &__fill_warning {
+    @include fill;
+
+    background: var(--mui-palette-warning-main);
+  }
+
+  &__fill_danger {
+    @include fill;
+
+    background: var(--mui-palette-error-main);
+  }
+
+  &__fill_offline {
+    @include fill;
+
+    background: var(--mui-palette-text-disabled);
+  }
+
+  &__mark {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--mui-palette-background-paper);
+  }
+
+  &__note_normal {
+    @include note;
+
+    color: var(--mui-palette-text-secondary);
+  }
+
+  &__note_warning {
+    @include note;
+
+    color: var(--mui-palette-warning-main);
+  }
+
+  &__note_danger {
+    @include note;
+
+    color: var(--mui-palette-error-main);
+  }
+
+  &__note_offline {
+    @include note;
+
+    color: var(--mui-palette-error-main);
+  }
+}

@@ -3,7 +3,7 @@ import type { MessageEvent } from '@nestjs/common';
 import type { Observable } from 'rxjs';
 import { liveSubscriptionKeySchema } from '@fieldstream/contracts';
 import type { LiveSubscriptionKey } from '@fieldstream/contracts';
-import { CurrentUser } from '../auth/auth.guard.js';
+import { CurrentUser, QueryToken } from '../auth/auth.guard.js';
 import type { AuthenticatedRequest } from '../auth/auth.guard.js';
 import type { AccessClaims } from '../auth/tokens.js';
 import { LiveBusService } from './live-bus.service.js';
@@ -32,6 +32,7 @@ export class EventsController {
    * по сторожу тишины поставить его нечем.
    */
   @Sse()
+  @QueryToken()
   public stream(
     @Req() request: AuthenticatedRequest,
     @Query('keys') keys: string | undefined,

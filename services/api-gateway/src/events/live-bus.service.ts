@@ -46,6 +46,7 @@ export class LiveBusService implements OnModuleInit, OnModuleDestroy {
   private readonly ring: LiveRing;
   private ping: NodeJS.Timeout | undefined;
   private streams = 0;
+  private published = 0;
 
   public constructor(
     @Inject(ENV) private readonly env: Env,
@@ -70,12 +71,18 @@ export class LiveBusService implements OnModuleInit, OnModuleDestroy {
   /** Рассылает событие и кладёт его в кольцо, откуда его добирает вернувшийся клиент. */
   public publish(kind: LiveEventKind, keys: readonly string[], data: object): void {
     const event = this.ring.append(kind, keys, data);
+    this.published += 1;
     this.metrics.observeEvent(kind);
     this.channel.next(event);
   }
 
   public openStreams(): number {
     return this.streams;
+  }
+
+  /** Сколько событий разослано с запуска: по приросту считается темп канала. */
+  public publishedEvents(): number {
+    return this.published;
   }
 
   public epoch(): number {

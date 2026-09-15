@@ -1,5 +1,10 @@
 import type { Clock } from '@fieldstream/domain';
-import type { SimFaultKind, SimFaultRequest, SimTargetKind } from '@fieldstream/contracts';
+import type {
+  SimClearFaultsQuery,
+  SimFaultKind,
+  SimFaultRequest,
+  SimTargetKind,
+} from '@fieldstream/contracts';
 
 /** Внесённая поломка. Срок жизни идёт по реальным часам и не зависит от ускорения стенда. */
 export interface ActiveFault {
@@ -15,12 +20,18 @@ export interface ActiveFault {
 
 export interface FaultBook {
   readonly add: (request: SimFaultRequest, paramKey: string | null) => ActiveFault;
-  readonly clear: () => number;
+  /** Снимает поломки под фильтр по коду цели и виду, без фильтра все. Возвращает число снятых. */
+  readonly clear: (filter?: SimClearFaultsQuery) => number;
   readonly list: () => ActiveFault[];
   readonly affecting: (lineCode: string, deviceCode: string) => ActiveFault[];
   readonly onLine: (lineCode: string, kind: SimFaultKind) => boolean;
   readonly onDevice: (deviceCode: string, kind: SimFaultKind) => boolean;
 }
+
+/** Подходит ли поломка под фильтр снятия: цель сравнивается с тем, на что поломка внесена. */
+const matches = (fault: ActiveFault, filter: SimClearFaultsQuery): boolean =>
+  (filter.targetId === undefined || fault.targetId === filter.targetId) &&
+  (filter.kind === undefined || fault.kind === filter.kind);
 
 /** Журнал поломок. Повтор того же вида на ту же цель продлевает прежнюю поломку, а не копится. */
 export const createFaultBook = (clock: Clock): FaultBook => {
@@ -62,10 +73,10 @@ export const createFaultBook = (clock: Clock): FaultBook => {
       ];
       return fault;
     },
-    clear: () => {
-      const removed = active().length;
-      faults = [];
-      return removed;
+    clear: (filter = {}) => {
+      const current = active();
+      faults = current.filter((fault) => !matches(fault, filter));
+      return current.length - faults.length;
     },
     list: () => [...active()],
     affecting: (lineCode, deviceCode) =>

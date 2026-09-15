@@ -1,0 +1,27 @@
+{
+  "name": "@fieldstream/scenario-ci",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "start": "node dist/main.js",
+    "scenarios": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fieldstream/contracts": "workspace:*",
+    "@fieldstream/domain": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.11"
+  }
+}

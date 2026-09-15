@@ -160,10 +160,14 @@ export interface OpenAlarmEpisode {
 }
 
 /**
- * Незакрытые эпизоды из базы. Состояние алармов живёт в памяти процессора, и без восстановления
- * перезапуск оставил бы открытые эпизоды сиротами.
+ * Незакрытые эпизоды из базы, всех приборов или только перечисленных. Состояние алармов живёт
+ * в памяти процессора, и без восстановления переезд прибора в другой экземпляр или перезапуск
+ * оставили бы открытые эпизоды сиротами.
  */
-export const loadOpenAlarmEpisodes = async (client: pg.ClientBase): Promise<OpenAlarmEpisode[]> => {
+export const loadOpenAlarmEpisodes = async (
+  client: pg.ClientBase,
+  deviceCodes?: readonly string[],
+): Promise<OpenAlarmEpisode[]> => {
   const result = await client.query<{
     device_code: string;
     metric_key: string;
@@ -176,8 +180,9 @@ export const loadOpenAlarmEpisodes = async (client: pg.ClientBase): Promise<Open
     `SELECT d.code AS device_code, e.metric_key, e.mode, e.boundary, e.severity,
             e.threshold, e.occurred_at
      FROM core.alarm_events e JOIN core.devices d ON d.id = e.device_id
-     WHERE e.cleared_at IS NULL
+     WHERE e.cleared_at IS NULL AND ($1::text[] IS NULL OR d.code = ANY($1::text[]))
      ORDER BY e.occurred_at`,
+    [deviceCodes === undefined ? null : [...deviceCodes]],
   );
 
   return result.rows.map((row) => ({

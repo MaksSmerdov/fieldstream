@@ -1,0 +1,63 @@
+.ladder {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 32px;
+  }
+
+  &__scroll {
+    overflow-x: auto;
+  }
+
+  &__chart {
+    display: block;
+    width: 100%;
+    min-width: 300px;
+    height: auto;
+    aspect-ratio: 360 / 200;
+  }
+
+  &__axis {
+    stroke: var(--mui-palette-divider);
+    stroke-width: 1;
+  }
+
+  &__band {
+    fill: var(--mui-palette-primary-main);
+    fill-opacity: 0.18;
+  }
+
+  &__tread {
+    stroke: var(--mui-palette-primary-main);
+    stroke-width: 2;
+  }
+
+  &__tick {
+    fill: var(--mui-palette-text-secondary);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__dot {
+    fill: var(--mui-palette-warning-main);
+    stroke: var(--mui-palette-background-paper);
+    stroke-width: 1.5;
+  }
+
+  &__legend {
+    display: block;
+  }
+
+  &__summary {
+    min-height: 40px;
+    font-variant-numeric: tabular-nums;
+  }
+}

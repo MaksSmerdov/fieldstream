@@ -1,0 +1,19 @@
+name: crc-garbage
+title: Мусор в кадре
+description: >-
+  Контроллер RC-101 отвечает кадрами с битой контрольной суммой. Размыкатель отсекает прибор,
+  а мусор отбрасывается ещё на сборщике и не доезжает до Kafka: очередь недоставленных
+  не растёт.
+timeoutSec: 210
+steps:
+  - inject: { targetKind: device, targetId: RC-101, kind: crc, ttlSec: 210 }
+  - waitFor:
+      probe: { breaker: { deviceCode: RC-101, state: open } }
+      timeoutSec: 45
+  - hold:
+      probe: { dlqUnchanged: true }
+      forSec: 20
+  - clear: { targetId: RC-101, kind: crc }
+  - waitFor:
+      probe: { breaker: { deviceCode: RC-101, state: closed } }
+      timeoutSec: 90

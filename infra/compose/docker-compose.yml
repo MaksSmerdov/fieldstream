@@ -37,7 +37,7 @@ services:
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_HEAP_OPTS: -Xmx512m -Xms512m
     ports:
-      - '29092:29092'
+      - '127.0.0.1:29092:29092'
     volumes:
       - kafka-data:/var/lib/kafka/data
     mem_limit: 1g
@@ -109,8 +109,8 @@ services:
     image: fieldstream/device-sim:dev
     env_file: ../../.env
     ports:
-      - '5020-5023:5020-5023'
-      - '8090:8090'
+      - '127.0.0.1:5020-5023:5020-5023'
+      - '127.0.0.1:8090:8090'
     stop_grace_period: 30s
     restart: unless-stopped
 
@@ -164,6 +164,7 @@ services:
       KAFKA_BROKERS: kafka:9092
       DATABASE_HOST: timescaledb
       TRUST_PROXY: 'on'
+      SIM_URL: http://device-sim:8090
     depends_on:
       kafka-init:
         condition: service_completed_successfully
@@ -194,7 +195,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: fieldstream
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     ports:
-      - '8081:8080'
+      - '127.0.0.1:8081:8080'
 
 volumes:
   tsdb-data:

@@ -9,10 +9,19 @@ import {
   deviceEventsResponseSchema,
   deviceProfileViewSchema,
   deviceSnapshotSchema,
+  dlqListResponseSchema,
+  dlqRedriveSchema,
+  labFaultsResponseSchema,
+  labLinesResponseSchema,
   meResponseSchema,
+  pipelineResponseSchema,
   readPlanResponseSchema,
+  scenarioRunSchema,
+  scenariosResponseSchema,
   seriesResponseSchema,
   sessionResponseSchema,
+  simClearFaultsResultSchema,
+  simFaultSchema,
   topologyResponseSchema,
 } from '@fieldstream/contracts';
 import type {
@@ -30,11 +39,24 @@ import type {
   DeviceEventsResponse,
   DeviceProfileView,
   DeviceSnapshot,
+  DlqListQuery,
+  DlqListResponse,
+  DlqRedrive,
+  LabFaultRequestInput,
+  LabFaultsResponse,
+  LabLinesResponse,
   MeResponse,
+  PipelineResponse,
   PlanMode,
   ReadPlanResponse,
+  ScenarioRun,
+  ScenarioRunRequestInput,
+  ScenariosResponse,
   SeriesResponse,
   SessionResponse,
+  SimClearFaultsQuery,
+  SimClearFaultsResult,
+  SimFault,
 } from '@fieldstream/contracts';
 import { alarmListItemSchema } from '@fieldstream/contracts';
 import { request } from './http.js';
@@ -153,4 +175,52 @@ export const api = {
 
   commandProgress: async (commandId: string): Promise<CommandProgressResponse> =>
     request(`/api/commands/${commandId}`, (value) => commandProgressSchema.parse(value)),
+
+  pipeline: async (): Promise<PipelineResponse> =>
+    request('/api/pipeline', (value) => pipelineResponseSchema.parse(value)),
+
+  dlq: async (params: Partial<DlqListQuery>): Promise<DlqListResponse> =>
+    request(`/api/dlq${query({ limit: params.limit, cursor: params.cursor })}`, (value) =>
+      dlqListResponseSchema.parse(value),
+    ),
+
+  redriveDlq: async (max: number): Promise<DlqRedrive> =>
+    request('/api/dlq/redrive', (value) => dlqRedriveSchema.parse(value), {
+      method: 'POST',
+      body: { max },
+    }),
+
+  dlqRedrive: async (id: string): Promise<DlqRedrive> =>
+    request(`/api/dlq/redrive/${id}`, (value) => dlqRedriveSchema.parse(value)),
+
+  labLines: async (): Promise<LabLinesResponse> =>
+    request('/api/lab/lines', (value) => labLinesResponseSchema.parse(value)),
+
+  labFaults: async (): Promise<LabFaultsResponse> =>
+    request('/api/lab/faults', (value) => labFaultsResponseSchema.parse(value)),
+
+  injectFault: async (fault: LabFaultRequestInput): Promise<SimFault> =>
+    request('/api/lab/faults', (value) => simFaultSchema.parse(value), {
+      method: 'POST',
+      body: fault,
+    }),
+
+  clearFaults: async (filter: SimClearFaultsQuery): Promise<SimClearFaultsResult> =>
+    request(
+      `/api/lab/faults${query({ targetId: filter.targetId, kind: filter.kind })}`,
+      (value) => simClearFaultsResultSchema.parse(value),
+      { method: 'DELETE' },
+    ),
+
+  scenarios: async (): Promise<ScenariosResponse> =>
+    request('/api/scenarios', (value) => scenariosResponseSchema.parse(value)),
+
+  runScenario: async (name: string): Promise<ScenarioRun> =>
+    request(`/api/scenarios/${name}/run`, (value) => scenarioRunSchema.parse(value), {
+      method: 'POST',
+      body: { source: 'ui' } satisfies ScenarioRunRequestInput,
+    }),
+
+  scenarioRun: async (id: string): Promise<ScenarioRun> =>
+    request(`/api/scenario-runs/${id}`, (value) => scenarioRunSchema.parse(value)),
 };

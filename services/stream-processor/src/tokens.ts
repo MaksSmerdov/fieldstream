@@ -4,3 +4,4 @@ export const LOGGER = Symbol('LOGGER');
 export const CLOCK = Symbol('CLOCK');
 export const METRICS = Symbol('METRICS');
 export const POOL = Symbol('POOL');
+export const INSTANCE_ID = Symbol('INSTANCE_ID');

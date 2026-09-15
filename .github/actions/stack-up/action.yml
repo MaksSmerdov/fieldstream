@@ -1,0 +1,43 @@
+name: Поднять стенд
+description: Окружение, сборка и запуск стенда в Docker, ожидание его собственного признака готовности
+
+inputs:
+  stand-env:
+    description: Содержимое файла .env для стенда
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Окружение стенда
+      shell: bash
+      env:
+        STAND_ENV: ${{ inputs.stand-env }}
+      run: printf '%s\n' "$STAND_ENV" > .env
+
+    - name: Поднять стенд
+      shell: bash
+      run: docker compose -f infra/compose/docker-compose.yml up -d --build
+
+    # Панель готовности отвечает раньше, чем стенд действительно готов: ждём не порт,
+    # а признак готовности, который стенд выставляет сам после засева истории.
+    # Стадии печатаются по ходу ожидания, иначе упавший прогон не говорит, на чём он встал
+    - name: Дождаться готовности
+      shell: bash
+      run: |
+        for attempt in $(seq 1 180); do
+          boot=$(curl -sf http://localhost:8080/api/boot || true)
+          case "$boot" in
+            *'"ready":true'*)
+              echo "стенд готов за $((attempt * 5)) с"
+              exit 0
+              ;;
+          esac
+          if [ $((attempt % 12)) -eq 0 ]; then
+            echo "$((attempt * 5)) с: ${boot:-панель готовности не отвечает}"
+          fi
+          sleep 5
+        done
+        echo "стенд не поднялся за 15 минут, последнее состояние:"
+        curl -s http://localhost:8080/api/boot || echo "панель готовности не отвечает"
+        exit 1

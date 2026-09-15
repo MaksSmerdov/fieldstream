@@ -1,0 +1,182 @@
+.card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  &__id {
+    min-width: 0;
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    overflow-wrap: anywhere;
+  }
+
+  &__facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__lag {
+    font-weight: 600;
+  }
+
+  &__quiet {
+    color: var(--mui-palette-text-secondary);
+  }
+
+  &__members {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__member {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 10px;
+    min-height: 24px;
+    font-size: 0.85rem;
+  }
+
+  &__client {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  &__assigned {
+    flex-basis: 100%;
+    padding-left: 22px;
+    color: var(--mui-palette-text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  &__swatch {
+    flex: 0 0 auto;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  &__swatch_tone0 {
+    background: var(--mui-palette-primary-main);
+  }
+
+  &__swatch_tone1 {
+    background: var(--mui-palette-success-main);
+  }
+
+  &__swatch_tone2 {
+    background: var(--mui-palette-secondary-main);
+  }
+
+  &__swatch_tone3 {
+    background: var(--mui-palette-info-main);
+  }
+
+  &__swatch_tone4 {
+    background: var(--mui-palette-warning-main);
+  }
+
+  &__swatch_tone5 {
+    background: var(--mui-palette-text-primary);
+  }
+
+  &__topic {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  &__caption {
+    color: var(--mui-palette-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__rows {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 96px minmax(80px, 1fr) fit-content(50%);
+    grid-template-areas:
+      'partition owner status'
+      'bar bar bar';
+    align-items: center;
+    gap: 4px 10px;
+    min-height: 52px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--mui-palette-divider);
+    font-size: 0.85rem;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__partition {
+    grid-area: partition;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__owner {
+    grid-area: owner;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__owner_none {
+    color: var(--mui-palette-text-disabled);
+    font-style: italic;
+  }
+
+  &__status {
+    grid-area: status;
+    color: var(--mui-palette-text-secondary);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  &__bar {
+    grid-area: bar;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 12px;
+
+    &__row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        'partition owner'
+        'status status'
+        'bar bar';
+    }
+
+    &__status {
+      text-align: left;
+    }
+  }
+}

@@ -37,6 +37,8 @@ beforeAll(async () => {
       SSE_PING_MS: '1000',
       AUTH_SECRET: SECRET,
       SSE_BRIDGE: 'off',
+      PIPELINE_SAMPLER: 'off',
+      COLLECTOR_STATUS: 'off',
     }),
     log: createLogger('api-gateway', 'fatal'),
     clock,
@@ -91,5 +93,18 @@ describe('шлюз отдаёт серверное время', () => {
   it('живой канал без токена не отдаётся', async () => {
     expect((await fetch(`${base}/api/events`)).status).toBe(401);
     expect((await fetch(`${base}/api/events?access_token=подделка`)).status).toBe(401);
+  });
+
+  /**
+   * Строкой запроса токен принимает только живой канал. На ленте алармов тот же токен
+   * заголовком проходит вход и упирается в права, а строкой запроса не опознаётся вовсе.
+   */
+  it('обычный маршрут не принимает токен из строки запроса', async () => {
+    expect((await fetch(`${base}/api/alarms?access_token=${accessToken}`)).status).toBe(401);
+
+    const withHeader = await fetch(`${base}/api/alarms`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    expect(withHeader.status).toBe(403);
   });
 });

@@ -1,0 +1,145 @@
+@mixin percentile-line {
+  stroke: var(--mui-palette-text-secondary);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+@mixin marker-label {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.histogram {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 32px;
+  }
+
+  &__count {
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__empty {
+    display: grid;
+    gap: 6px;
+    align-content: center;
+    min-height: 160px;
+    padding: 16px;
+    border: 1px dashed var(--mui-palette-divider);
+    border-radius: 12px;
+  }
+
+  &__scroll {
+    overflow-x: auto;
+  }
+
+  &__chart {
+    display: block;
+    width: 100%;
+    min-width: 480px;
+    height: auto;
+    aspect-ratio: 560 / 230;
+  }
+
+  &__axis {
+    stroke: var(--mui-palette-divider);
+    stroke-width: 1;
+  }
+
+  &__tick {
+    fill: var(--mui-palette-text-secondary);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__bar {
+    fill: var(--mui-palette-primary-main);
+    fill-opacity: 0.75;
+  }
+
+  &__bar_over {
+    fill: var(--mui-palette-error-main);
+    fill-opacity: 0.75;
+  }
+
+  &__marker_p50 {
+    @include percentile-line;
+  }
+
+  &__marker_p95 {
+    @include percentile-line;
+  }
+
+  &__marker_p99 {
+    @include percentile-line;
+  }
+
+  &__marker_suggested {
+    stroke: var(--mui-palette-success-main);
+    stroke-width: 2;
+  }
+
+  &__marker_timeout {
+    stroke: var(--mui-palette-error-main);
+    stroke-width: 2;
+  }
+
+  &__label_p50 {
+    @include marker-label;
+
+    fill: var(--mui-palette-text-secondary);
+  }
+
+  &__label_p95 {
+    @include marker-label;
+
+    fill: var(--mui-palette-text-secondary);
+  }
+
+  &__label_p99 {
+    @include marker-label;
+
+    fill: var(--mui-palette-text-secondary);
+  }
+
+  &__label_suggested {
+    @include marker-label;
+
+    fill: var(--mui-palette-success-main);
+  }
+
+  &__label_timeout {
+    @include marker-label;
+
+    fill: var(--mui-palette-error-main);
+  }
+
+  &__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 0;
+    padding: 0;
+    color: var(--mui-palette-text-secondary);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    list-style: none;
+  }
+
+  &__legend-timeout {
+    color: var(--mui-palette-error-main);
+  }
+
+  &__legend-suggested {
+    color: var(--mui-palette-success-main);
+  }
+}

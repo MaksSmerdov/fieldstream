@@ -1,0 +1,21 @@
+name: offscale-alarm
+title: Температура за шкалой
+description: >-
+  Датчик температуры подачи на RC-102 выдаёт значение за шкалой. Фильтр скачков пропускает его
+  с третьего кадра, затем поднимается аларм по supply_temp_c. В оттайке аларм подтверждается
+  дольше, поэтому ждём до двух минут. После снятия поломки аларм гаснет сам.
+timeoutSec: 240
+steps:
+  - inject:
+      targetKind: device
+      targetId: RC-102
+      kind: offscale
+      paramKey: supply_temp_c
+      ttlSec: 240
+  - waitFor:
+      probe: { alarm: { deviceCode: RC-102, metricKey: supply_temp_c, active: true } }
+      timeoutSec: 120
+  - clear: { targetId: RC-102, kind: offscale }
+  - waitFor:
+      probe: { alarm: { deviceCode: RC-102, metricKey: supply_temp_c, active: false } }
+      timeoutSec: 60

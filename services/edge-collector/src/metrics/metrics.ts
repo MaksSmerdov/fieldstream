@@ -1,11 +1,14 @@
 import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from '@prometheus-io/client';
 import type { ErrorKind } from '@fieldstream/contracts';
+import { LATENCY_BUCKETS_MS } from '../polling/latency.js';
 
 /** Метрики сборщика в формате Prometheus. */
 export interface CollectorMetrics {
   readonly registry: Registry;
   readonly observePoll: (lineCode: string, errorKind: ErrorKind | null) => void;
+  readonly observeRequest: (lineCode: string, durationMs: number) => void;
   readonly observeCycle: (lineCode: string, durationMs: number) => void;
+  readonly observeWatchdogTrip: (lineCode: string) => void;
   readonly observeReconnect: (lineCode: string) => void;
   readonly setOpenBreakers: (lineCode: string, count: number) => void;
   readonly setBuffer: (size: number) => void;
@@ -29,6 +32,19 @@ export const createMetrics = (): CollectorMetrics => {
     help: 'Длительность обхода линии',
     labelNames: ['line'],
     buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30],
+    registers: [registry],
+  });
+  const requests = new Histogram({
+    name: 'fieldstream_collector_request_duration_seconds',
+    help: 'Время ответа на успешный запрос к прибору',
+    labelNames: ['line'],
+    buckets: LATENCY_BUCKETS_MS.map((bound) => bound / 1000),
+    registers: [registry],
+  });
+  const watchdogTrips = new Counter({
+    name: 'fieldstream_collector_watchdog_trips_total',
+    help: 'Срабатывания сторожа цикла: обход завис и был брошен',
+    labelNames: ['line'],
     registers: [registry],
   });
   const reconnects = new Counter({
@@ -64,8 +80,14 @@ export const createMetrics = (): CollectorMetrics => {
     observePoll: (line, errorKind) => {
       polls.inc({ line, outcome: errorKind ?? 'ok' });
     },
+    observeRequest: (line, durationMs) => {
+      requests.observe({ line }, durationMs / 1000);
+    },
     observeCycle: (line, durationMs) => {
       cycles.observe({ line }, durationMs / 1000);
+    },
+    observeWatchdogTrip: (line) => {
+      watchdogTrips.inc({ line });
     },
     observeReconnect: (line) => {
       reconnects.inc({ line });

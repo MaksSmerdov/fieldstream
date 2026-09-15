@@ -1,0 +1,43 @@
+.instruments {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+
+  &__head {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 12px 14px;
+  }
+
+  &__title {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    align-items: baseline;
+    min-width: 0;
+  }
+
+  &__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__facts {
+    display: block;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__missing {
+    min-height: 56px;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    gap: 16px;
+    align-items: start;
+    min-width: 0;
+  }
+}

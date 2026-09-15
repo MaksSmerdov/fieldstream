@@ -95,6 +95,18 @@ export const simFaultSchema = z
   .strict();
 export type SimFault = z.infer<typeof simFaultSchema>;
 
+/** Выборочное снятие поломок: без фильтров снимаются все. */
+export const simClearFaultsQuerySchema = z
+  .object({
+    targetId: z.union([lineCodeSchema, deviceCodeSchema]).optional(),
+    kind: simFaultKindSchema.optional(),
+  })
+  .strict();
+export type SimClearFaultsQuery = z.infer<typeof simClearFaultsQuerySchema>;
+
+export const simClearFaultsResultSchema = z.object({ removed: z.number().int().min(0) }).strict();
+export type SimClearFaultsResult = z.infer<typeof simClearFaultsResultSchema>;
+
 export const simScenarioNameSchema = z.enum([
   'night-defrost',
   'power-dip',
@@ -102,6 +114,32 @@ export const simScenarioNameSchema = z.enum([
   'line-blackout',
 ]);
 export type SimScenarioName = z.infer<typeof simScenarioNameSchema>;
+
+/** Итог одной поломки сценария симулятора: поломка, разовое действие или отказ стенда. */
+export const simScenarioResultSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('fault'), fault: simFaultSchema }).strict(),
+  z
+    .object({
+      outcome: z.literal('action'),
+      action: z.literal('defrost_started'),
+      deviceCode: deviceCodeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      outcome: z.literal('rejected'),
+      status: z.number().int(),
+      message: z.string(),
+    })
+    .strict(),
+]);
+export type SimScenarioResult = z.infer<typeof simScenarioResultSchema>;
+
+/** Ответ стенда на запуск сценария: по итогу на каждую поломку сценария. */
+export const simScenarioResponseSchema = z
+  .object({ scenario: simScenarioNameSchema, results: z.array(simScenarioResultSchema) })
+  .strict();
+export type SimScenarioResponse = z.infer<typeof simScenarioResponseSchema>;
 
 /** Ускорение времени стенда: на 60x сутки проживаются за 24 минуты. */
 export const simSpeedRequestSchema = z.object({ factor: z.number().min(1).max(60) }).strict();

@@ -122,6 +122,8 @@ beforeAll(async () => {
       AUTH_SECRET: SECRET,
       SSE_BRIDGE: 'off',
       OUTBOX_RELAY: 'off',
+      PIPELINE_SAMPLER: 'off',
+      COLLECTOR_STATUS: 'off',
     }),
     log: createLogger('api-gateway', 'fatal'),
     clock,

@@ -13,7 +13,45 @@ import { connectionUrl } from '../../src/setup/connection.js';
 import type { ConnectionTarget } from '../../src/setup/connection.js';
 import { MIGRATIONS_DIR, runMigrations } from '../../src/setup/migrate.js';
 import { ROLES, bootstrapDatabase } from '../../src/setup/roles.js';
-import { loadAlarmRules, syncAlarmRules } from '../../src/store/alarms.js';
+import {
+  clearAlarmEvents,
+  insertAlarmEvents,
+  loadAlarmRules,
+  loadOpenAlarmEpisodes,
+  syncAlarmRules,
+} from '../../src/store/alarms.js';
+import type { AlarmEventRow } from '../../src/store/alarms.js';
+import {
+  claimDlqRedrive,
+  enqueueDlqRedrive,
+  failStaleDlqRedrives,
+  listDlqMessages,
+  loadDlqCounts,
+  loadDlqRedrive,
+  markDlqResolved,
+  resolveDlqCopies,
+  selectDlqForRedrive,
+} from '../../src/store/dlq.js';
+import {
+  loadDeviceStates,
+  lockDeviceStateHandover,
+  recordDlqMessages,
+  upsertDeviceStates,
+} from '../../src/store/state.js';
+import {
+  countAlarmsRaisedSince,
+  createScenarioRun,
+  failStaleScenarioRuns,
+  finishScenarioRun,
+  loadActiveAlarmFacts,
+  loadActiveScenarioRun,
+  loadLastScenarioRuns,
+  loadScenarioRun,
+  loadStandDeviceFacts,
+  touchScenarioRun,
+  updateScenarioRunProgress,
+} from '../../src/store/scenarios.js';
+import type { ScenarioRunEntry } from '../../src/store/scenarios.js';
 import { loadDeviceRefs, syncTopology } from '../../src/store/topology.js';
 import { insertPollCycles, insertReadings } from '../../src/store/writer.js';
 import type { ReadingRow } from '../../src/store/writer.js';
@@ -130,6 +168,284 @@ describe('схема базы на настоящей TimescaleDB', () => {
     ).rejects.toThrow(/permission denied/);
   });
 
+  it('роль интерфейса считает очередь недоставленных: неразобранные отдельно от всех', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const before = await loadDlqCounts(api);
+
+    await ingest.query(
+      `INSERT INTO core.dlq_message (source_topic, partition, "offset", error, resolved_at,
+         final_rejected)
+       VALUES ('dlq-count', 0, 1, '{}', NULL, false), ('dlq-count', 0, 2, '{}', NULL, false),
+              ('dlq-count', 0, 3, '{}', now(), false), ('dlq-count', 0, 4, '{}', NULL, true)`,
+    );
+
+    expect(await loadDlqCounts(api)).toEqual({
+      unresolved: before.unresolved + 2,
+      total: before.total + 4,
+    });
+  });
+
+  it('очередь недоставленных листается курсором от новых к старым без пропусков и повторов', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const firstSeen = '2026-09-11T10:00:00.000Z';
+
+    await recordDlqMessages(
+      ingest,
+      [1, 2, 3].map((offset) => ({
+        sourceTopic: 'dlq-list',
+        partition: 2,
+        offset: String(offset),
+        key: 'RC-102',
+        headers: {},
+        payload: Buffer.from([0x7b, 0xff, 0x00, 0x41]),
+        errorClass: 'invalid_json',
+        error: 'Unexpected token',
+        attempts: offset,
+        firstSeen,
+      })),
+    );
+
+    const first = await listDlqMessages(api, { limit: 2 });
+    expect(first.items.map((item) => item.offset)).toEqual(['3', '2']);
+    expect(first.items[0]).toMatchObject({
+      sourceTopic: 'dlq-list',
+      partition: 2,
+      key: 'RC-102',
+      errorClass: 'invalid_json',
+      error: 'Unexpected token',
+      attempts: 3,
+      firstSeen,
+      resolvedAt: null,
+      finalRejected: false,
+      payloadPreview: '{··A',
+      payloadBytes: 4,
+    });
+    expect(first.nextCursor).toBe(first.items[1]?.id);
+
+    const second = await listDlqMessages(api, { limit: 2, cursor: first.nextCursor ?? '' });
+    expect(second.items[0]?.offset).toBe('1');
+    expect(second.items[0]?.attempts).toBe(1);
+
+    const ids: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await listDlqMessages(api, { limit: 2, cursor });
+      ids.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
+
+    const total = await api.query<{ n: string }>('SELECT count(*) AS n FROM core.dlq_message');
+    expect(ids).toHaveLength(Number(total.rows[0]?.n));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.map(BigInt)).toEqual([...ids.map(BigInt)].sort((a, b) => (a > b ? -1 : 1)));
+  });
+
+  it('запрос повторной подачи достаётся одному экземпляру, а отобранные сообщения не двоятся', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const first = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const second = await connect(ROLES.ingest, PASSWORDS.ingest);
+
+    const queued = [
+      await enqueueDlqRedrive(api, { requestedBy: 'engineer@fieldstream.local', maxMessages: 2 }),
+      await enqueueDlqRedrive(api, { requestedBy: 'engineer@fieldstream.local', maxMessages: 2 }),
+    ];
+    expect(queued.map((request) => request.status)).toEqual(['queued', 'queued']);
+
+    await first.query('BEGIN');
+    const mine = await claimDlqRedrive(first);
+    const theirs = await claimDlqRedrive(second);
+    const candidates = await selectDlqForRedrive(first, { topics: ['dlq-list'], limit: 2 });
+    await second.query('BEGIN');
+    const skipped = await selectDlqForRedrive(second, { topics: ['dlq-list'], limit: 2 });
+    await second.query('ROLLBACK');
+    await first.query('COMMIT');
+
+    expect(mine?.status).toBe('running');
+    expect(theirs?.status).toBe('running');
+    expect(mine?.id).not.toBe(theirs?.id);
+    expect([mine?.id, theirs?.id].sort()).toEqual(queued.map((request) => request.id).sort());
+    expect(await claimDlqRedrive(second)).toBeNull();
+
+    expect(candidates.map((row) => row.attempts)).toEqual([1, 2]);
+    expect(skipped.map((row) => row.attempts)).toEqual([3]);
+    expect((await loadDlqRedrive(api, mine?.id ?? '0'))?.startedAt).not.toBeNull();
+  });
+
+  it('роль интерфейса кладёт запрос повторной подачи, но не меняет ни очередь, ни запрос', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const request = await enqueueDlqRedrive(api, {
+      requestedBy: 'engineer@fieldstream.local',
+      maxMessages: 10,
+    });
+
+    await expect(
+      api.query(`UPDATE core.dlq_message SET resolved_at = now() WHERE source_topic = 'dlq-list'`),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      api.query(`DELETE FROM core.dlq_message WHERE source_topic = 'dlq-list'`),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      api.query(`UPDATE core.dlq_redrive SET status = 'done' WHERE id = $1`, [request.id]),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      api.query(
+        `INSERT INTO core.dlq_redrive (requested_by, max_messages, status) VALUES ($1, 10, 'running')`,
+        ['engineer@fieldstream.local'],
+      ),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      api.query(
+        `INSERT INTO core.dlq_redrive (requested_by, max_messages, redriven, finished_at)
+         VALUES ($1, 10, 99, now())`,
+        ['engineer@fieldstream.local'],
+      ),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      enqueueDlqRedrive(api, { requestedBy: 'engineer@fieldstream.local', maxMessages: 501 }),
+    ).rejects.toThrow(/check constraint/);
+  });
+
+  it('отметка о разборе не перетирает прежнюю и не трогает окончательно отвергнутые', async () => {
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const inserted = await ingest.query<{ id: string }>(
+      `INSERT INTO core.dlq_message (source_topic, partition, "offset", error, resolved_at,
+         final_rejected)
+       VALUES ('dlq-resolve', 0, 1, '{}', NULL, false),
+              ('dlq-resolve', 0, 2, '{}', '2026-09-11T09:00:00Z', false),
+              ('dlq-resolve', 0, 3, '{}', NULL, true)
+       RETURNING id`,
+    );
+    const ids = inserted.rows.map((row) => row.id);
+
+    await markDlqResolved(ingest, ids, '2026-09-11T10:00:00.000Z');
+
+    const rows = await ingest.query<{ resolved_at: Date | null }>(
+      `SELECT resolved_at FROM core.dlq_message WHERE source_topic = 'dlq-resolve' ORDER BY id`,
+    );
+    expect(rows.rows.map((row) => row.resolved_at?.toISOString() ?? null)).toEqual([
+      '2026-09-11T10:00:00.000Z',
+      '2026-09-11T09:00:00.000Z',
+      null,
+    ]);
+  });
+
+  it('две копии одной строки очереди дают одну неудачу, повтор смещения тоже, чужой номер не пишется', async () => {
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const origins = await ingest.query<{ id: string }>(
+      `INSERT INTO core.dlq_message (source_topic, partition, "offset", key, error)
+       VALUES ('dlq-copies', 0, 900, 'RC-102', '{}'), ('dlq-copies', 0, 901, 'RC-102', '{}')
+       RETURNING id`,
+    );
+    const [first = null, second = null] = origins.rows.map((origin) => origin.id);
+    const row = (offset: number, redriveOf: string | null, key = 'RC-102') => ({
+      sourceTopic: 'dlq-copies',
+      partition: 0,
+      offset: String(offset),
+      key,
+      headers: {},
+      payload: Buffer.from('{не json'),
+      errorClass: 'invalid_json',
+      error: 'Unexpected token',
+      attempts: 2,
+      redriveOf,
+    });
+
+    await recordDlqMessages(ingest, [row(1, first), row(2, first), row(3, null), row(4, null)]);
+    await recordDlqMessages(ingest, [row(3, null), row(6, second, 'RC-999'), row(5, second)]);
+
+    const stored = await ingest.query<{ offset: string; redrive_of: string | null }>(
+      `SELECT "offset", redrive_of FROM core.dlq_message
+       WHERE source_topic = 'dlq-copies' AND "offset" < 900
+       ORDER BY id`,
+    );
+    expect(stored.rows).toEqual([
+      { offset: '1', redrive_of: first },
+      { offset: '3', redrive_of: null },
+      { offset: '4', redrive_of: null },
+      { offset: '6', redrive_of: null },
+      { offset: '5', redrive_of: second },
+    ]);
+  });
+
+  it('копия закрывает только свою строку и не ждёт строку, которую держит подача', async () => {
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const redriving = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const topic = 'dlq-copy-close';
+    const inserted = await ingest.query<{ id: string }>(
+      `INSERT INTO core.dlq_message (source_topic, partition, "offset", key, error)
+       VALUES ($1, 0, 1, 'RC-102', '{}'), ($1, 0, 2, 'RC-102', '{}'), ($1, 0, 3, NULL, '{}'),
+              ($1, 0, 4, 'RC-102', '{}'), ($1, 0, 5, 'RC-102', '{}')
+       RETURNING id`,
+      [topic],
+    );
+    const ids = inserted.rows.map((row) => row.id);
+    const copy = (index: number, sourceTopic: string, key: string | null) => ({
+      id: ids[index] ?? '0',
+      sourceTopic,
+      key,
+    });
+
+    await ingest.query(`SET lock_timeout = '2s'`);
+    await redriving.query('BEGIN');
+    const locked = await selectDlqForRedrive(redriving, { topics: [topic], limit: 1 });
+    await resolveDlqCopies(
+      ingest,
+      [
+        copy(0, topic, 'RC-102'),
+        copy(1, topic, 'RC-102'),
+        copy(2, topic, null),
+        copy(3, topic, 'RC-999'),
+        copy(4, 'dlq-other', 'RC-102'),
+      ],
+      '2026-09-11T10:00:00.000Z',
+    );
+    await redriving.query('ROLLBACK');
+
+    const rows = await ingest.query<{ resolved: boolean }>(
+      `SELECT resolved_at IS NOT NULL AS resolved FROM core.dlq_message
+       WHERE source_topic = $1 ORDER BY id`,
+      [topic],
+    );
+    expect(locked.map((row) => row.id)).toEqual([ids[0]]);
+    expect(rows.rows.map((row) => row.resolved)).toEqual([false, true, true, false, false]);
+  });
+
+  it('брошенный в работе запрос завершается с ошибкой, ждущие и забираемые сейчас не трогаются', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const claiming = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const entry = { requestedBy: 'engineer@fieldstream.local', maxMessages: 5 };
+    const stuck = await enqueueDlqRedrive(api, entry);
+    const done = await enqueueDlqRedrive(api, entry);
+    const waiting = await enqueueDlqRedrive(api, entry);
+
+    await ingest.query(
+      `UPDATE core.dlq_redrive SET status = 'running', started_at = now() WHERE id = $1`,
+      [stuck.id],
+    );
+    await ingest.query(
+      `UPDATE core.dlq_redrive SET status = 'done', finished_at = now() WHERE id = $1`,
+      [done.id],
+    );
+
+    await claiming.query('BEGIN');
+    const claimed = await claimDlqRedrive(claiming);
+    const failed = await failStaleDlqRedrives(ingest, 'брошен', '2026-09-11T10:00:00.000Z');
+    await claiming.query('ROLLBACK');
+
+    expect(failed).toBeGreaterThanOrEqual(1);
+    expect(await loadDlqRedrive(api, stuck.id)).toMatchObject({
+      status: 'failed',
+      error: 'брошен',
+      finishedAt: '2026-09-11T10:00:00.000Z',
+    });
+    expect((await loadDlqRedrive(api, done.id))?.status).toBe('done');
+    expect((await loadDlqRedrive(api, waiting.id))?.status).toBe('queued');
+    expect((await loadDlqRedrive(api, claimed?.id ?? '0'))?.status).toBe('queued');
+  });
+
   it('стартовые уставки заводятся на все приборы, а правка оператора переносом не затирается', async () => {
     const owner = await connect(ROLES.migrator, PASSWORDS.migrator);
 
@@ -200,6 +516,117 @@ describe('схема базы на настоящей TimescaleDB', () => {
     await expect(
       ingest.query('UPDATE core.alarm_rules SET max_value = 0 WHERE device_id = $1', [id]),
     ).rejects.toThrow(/permission denied/);
+  });
+
+  it('последнее состояние читается только по перечисленным приборам', async () => {
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const updatedAt = new Date(await hoursAgo(ingest, 0)).toISOString();
+    const online = {
+      schema: 'device.state',
+      v: 1,
+      deviceCode: 'RC-110',
+      status: 'online',
+      reason: 'ok',
+      since: '2026-09-11T10:00:00.000Z',
+      mode: 'defrost',
+      lastOkAt: '2026-09-11T10:04:30.000Z',
+      consecutiveErrors: 1,
+    } as const;
+    const offline = {
+      ...online,
+      deviceCode: 'RC-111',
+      status: 'offline',
+      reason: 'consecutive_errors',
+      mode: 'cooling',
+      lastOkAt: null,
+      consecutiveErrors: 5,
+    } as const;
+
+    await upsertDeviceStates(ingest, [
+      { deviceId: await deviceId(ingest, 'RC-110'), state: online, updatedAt },
+      { deviceId: await deviceId(ingest, 'RC-111'), state: offline, updatedAt },
+    ]);
+
+    expect(await loadDeviceStates(ingest, ['RC-111', 'RC-110', 'RC-999'])).toEqual([
+      online,
+      offline,
+    ]);
+    expect(await loadDeviceStates(ingest, ['RC-111'])).toEqual([offline]);
+    expect(await loadDeviceStates(ingest, ['PM-212'])).toEqual([]);
+  });
+
+  it('новый владелец не читает состояние, пока прежний дописывает проверку здоровья', async () => {
+    const publisher = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const neighbour = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const adopter = await connect(ROLES.ingest, PASSWORDS.ingest);
+
+    await publisher.query('BEGIN');
+    await lockDeviceStateHandover(publisher, 'publish');
+
+    await neighbour.query('BEGIN');
+    await lockDeviceStateHandover(neighbour, 'publish', 200);
+    await neighbour.query('COMMIT');
+
+    await adopter.query('BEGIN');
+    await expect(lockDeviceStateHandover(adopter, 'adopt', 200)).rejects.toThrow(/lock timeout/);
+    await adopter.query('ROLLBACK');
+
+    await publisher.query('COMMIT');
+    await adopter.query('BEGIN');
+    await lockDeviceStateHandover(adopter, 'adopt', 200);
+    await adopter.query('COMMIT');
+  });
+
+  it('открытые эпизоды фильтруются по приборам, закрытые не попадают вовсе', async () => {
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const base = await hoursAgo(ingest, 2);
+    const episode = async (deviceCode: string, offsetMs: number): Promise<AlarmEventRow> => {
+      const occurredAt = new Date(base + offsetMs).toISOString();
+      return {
+        alarmId: crypto.randomUUID(),
+        deviceId: await deviceId(ingest, deviceCode),
+        metricKey: 'supply_temp_c',
+        mode: 'cooling',
+        severity: 'critical',
+        boundary: 'max',
+        value: 7.5,
+        threshold: 2,
+        occurredAt,
+        dedupeKey: `${deviceCode}|supply_temp_c|cooling|raised|${occurredAt}`,
+      };
+    };
+    const rows = [
+      await episode('RC-106', 0),
+      await episode('RC-107', 1_000),
+      await episode('RC-108', 2_000),
+    ];
+    await insertAlarmEvents(ingest, rows);
+    await clearAlarmEvents(ingest, [
+      {
+        dedupeKey: rows[1]?.dedupeKey ?? '',
+        clearedAt: new Date(base + 60_000).toISOString(),
+        clearedValue: 1,
+      },
+    ]);
+
+    const filtered = await loadOpenAlarmEpisodes(ingest, ['RC-106', 'RC-107']);
+    expect(filtered).toEqual([
+      {
+        deviceCode: 'RC-106',
+        metricKey: 'supply_temp_c',
+        mode: 'cooling',
+        boundary: 'max',
+        severity: 'critical',
+        threshold: 2,
+        raisedAtMs: base,
+      },
+    ]);
+    expect(await loadOpenAlarmEpisodes(ingest, [])).toEqual([]);
+
+    const everyone = (await loadOpenAlarmEpisodes(ingest)).map((item) => item.deviceCode);
+    expect(everyone).toContain('RC-106');
+    expect(everyone).toContain('RC-108');
+    expect(everyone).not.toContain('RC-107');
   });
 
   it('команду в очередь кладёт интерфейс, а факт применения пишет процессор', async () => {
@@ -366,5 +793,235 @@ describe('схема базы на настоящей TimescaleDB', () => {
 
     expect(await insertReadings(ingest, series(hot))).toBe(30);
     expect(await insertReadings(ingest, series(hot))).toBe(0);
+  });
+
+  it('на стенде идёт один прогон сценария: второй активный не создаётся, итог освобождает стенд', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const createdAt = '2026-09-15T09:59:00.000Z';
+    const owner = { instanceId: 'gw-a', heartbeatAt: createdAt };
+    const entry = (scenario: string): ScenarioRunEntry => ({
+      scenario,
+      title: `Сценарий ${scenario}`,
+      source: 'ci',
+      requestedBy: 'engineer@fieldstream.local',
+      owner,
+      steps: [
+        {
+          index: 0,
+          kind: 'inject',
+          title: 'Внести поломку',
+          status: 'pending',
+          startedAt: null,
+          finishedAt: null,
+          detail: null,
+        },
+        {
+          index: 1,
+          kind: 'waitFor',
+          title: 'Дождаться размыкателя',
+          status: 'pending',
+          startedAt: null,
+          finishedAt: null,
+          detail: null,
+        },
+      ],
+    });
+
+    const first = await createScenarioRun(api, entry('dead-device'));
+    if (!first.created) throw new Error('первый прогон не создан');
+    expect(first.run).toMatchObject({
+      status: 'queued',
+      source: 'ci',
+      startedAt: null,
+      error: null,
+    });
+
+    const second = await createScenarioRun(api, entry('crc-garbage'));
+    expect(second).toEqual({ created: false, active: first.run });
+
+    const startedAt = '2026-09-15T10:00:00.000Z';
+    const [inject, wait] = first.run.steps;
+    if (inject === undefined || wait === undefined) throw new Error('шаги не записаны');
+    const progress = [
+      { ...inject, status: 'passed', startedAt, finishedAt: startedAt, detail: 'внесена' },
+      { ...wait, status: 'running', startedAt },
+    ] as const;
+    const beat = { ...owner, heartbeatAt: startedAt };
+    const stranger = { instanceId: 'gw-b', heartbeatAt: startedAt };
+    expect(
+      await updateScenarioRunProgress(api, first.run.id, stranger, { steps: [], startedAt }),
+    ).toBe(false);
+    expect(await touchScenarioRun(api, first.run.id, stranger)).toBe(false);
+    expect(
+      await updateScenarioRunProgress(api, first.run.id, beat, { steps: progress, startedAt }),
+    ).toBe(true);
+    expect(await touchScenarioRun(api, first.run.id, beat)).toBe(true);
+    expect(
+      await failStaleScenarioRuns(
+        api,
+        { staleBefore: createdAt, instanceId: 'gw-b' },
+        'чужой пульс свежий',
+        startedAt,
+      ),
+    ).toBe(0);
+    expect(await loadActiveScenarioRun(api)).toMatchObject({
+      id: first.run.id,
+      status: 'running',
+      startedAt,
+      steps: progress,
+    });
+
+    const finishedAt = '2026-09-15T10:05:00.000Z';
+    const outcome = {
+      status: 'passed',
+      steps: [progress[0], { ...progress[1], status: 'passed', finishedAt }],
+      error: null,
+      startedAt,
+      finishedAt,
+    } as const;
+    expect(await finishScenarioRun(api, first.run.id, outcome)).toBe(true);
+    expect(
+      await finishScenarioRun(api, first.run.id, { ...outcome, status: 'failed', error: 'поздно' }),
+    ).toBe(false);
+    expect(
+      await updateScenarioRunProgress(api, first.run.id, beat, {
+        steps: [],
+        startedAt: finishedAt,
+      }),
+    ).toBe(false);
+    expect(await touchScenarioRun(api, first.run.id, beat)).toBe(false);
+    expect(await loadScenarioRun(api, first.run.id)).toMatchObject({
+      status: 'passed',
+      error: null,
+      finishedAt,
+    });
+    expect(await loadActiveScenarioRun(api)).toBeNull();
+
+    const next = await createScenarioRun(api, entry('crc-garbage'));
+    if (!next.created) throw new Error('стенд не освободился после итога');
+    await updateScenarioRunProgress(api, next.run.id, beat, {
+      steps: [{ ...inject, status: 'running', startedAt }, wait],
+      startedAt,
+    });
+
+    expect(
+      await failStaleScenarioRuns(
+        api,
+        { staleBefore: createdAt, instanceId: null },
+        'пульс ещё свежий',
+        finishedAt,
+      ),
+    ).toBe(0);
+    expect(
+      await failStaleScenarioRuns(
+        api,
+        { staleBefore: finishedAt, instanceId: null },
+        'шлюз перезапустился',
+        finishedAt,
+      ),
+    ).toBe(1);
+    expect(await loadScenarioRun(api, next.run.id)).toMatchObject({
+      status: 'failed',
+      error: 'шлюз перезапустился',
+      finishedAt,
+      steps: [
+        { status: 'failed', finishedAt, detail: 'шлюз перезапустился' },
+        { status: 'skipped', finishedAt: null },
+      ],
+    });
+    expect(await loadScenarioRun(api, crypto.randomUUID())).toBeNull();
+
+    const last = await loadLastScenarioRuns(api);
+    expect(last.map((run) => [run.scenario, run.status])).toEqual([
+      ['crc-garbage', 'failed'],
+      ['dead-device', 'passed'],
+    ]);
+
+    await expect(
+      api.query('DELETE FROM core.scenario_run WHERE id = $1', [first.run.id]),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      api.query(
+        `INSERT INTO core.scenario_run (scenario, title, source, requested_by, status)
+         VALUES ('x', 'x', 'cli', 'x', 'queued')`,
+      ),
+    ).rejects.toThrow(/check constraint/);
+  });
+
+  it('факты стенда для сценариев читаются ролью интерфейса', async () => {
+    const api = await connect(ROLES.api, PASSWORDS.api);
+    const ingest = await connect(ROLES.ingest, PASSWORDS.ingest);
+    const base = await hoursAgo(ingest, 0);
+    const updatedAt = new Date(base).toISOString();
+    const state = {
+      schema: 'device.state',
+      v: 1,
+      deviceCode: 'RC-112',
+      status: 'online',
+      reason: 'ok',
+      since: updatedAt,
+      mode: 'defrost',
+      lastOkAt: updatedAt,
+      consecutiveErrors: 0,
+    } as const;
+
+    await upsertDeviceStates(ingest, [
+      { deviceId: await deviceId(ingest, 'RC-112'), state, updatedAt },
+      {
+        deviceId: await deviceId(ingest, 'PM-205'),
+        state: { ...state, deviceCode: 'PM-205', status: 'degraded', mode: 'cooling' },
+        updatedAt,
+      },
+    ]);
+
+    const episode = async (offsetMs: number): Promise<AlarmEventRow> => {
+      const occurredAt = new Date(base + offsetMs).toISOString();
+      return {
+        alarmId: crypto.randomUUID(),
+        deviceId: await deviceId(ingest, 'RC-112'),
+        metricKey: 'evap_temp_c',
+        mode: 'cooling',
+        severity: 'warning',
+        boundary: 'max',
+        value: 3,
+        threshold: 0,
+        occurredAt,
+        dedupeKey: `RC-112|evap_temp_c|cooling|raised|${occurredAt}`,
+      };
+    };
+    const rows = [await episode(-60_000), await episode(1_000), await episode(2_000)];
+    await insertAlarmEvents(ingest, rows);
+    await clearAlarmEvents(ingest, [
+      ...rows.slice(0, 2).map((row) => ({
+        dedupeKey: row.dedupeKey,
+        clearedAt: new Date(base + 3_000).toISOString(),
+        clearedValue: -1,
+      })),
+    ]);
+
+    const devices = await loadStandDeviceFacts(api);
+    const byCode = new Map(devices.map((device) => [device.deviceCode, device]));
+    expect(devices).toHaveLength(24);
+    expect(byCode.get('RC-112')).toEqual({
+      deviceCode: 'RC-112',
+      profileKey: 'rc-2000',
+      status: 'online',
+      reason: 'ok',
+      mode: 'defrost',
+    });
+    expect(byCode.get('PM-205')).toMatchObject({ status: 'degraded', mode: null });
+    expect(byCode.get('RC-109')).toMatchObject({
+      status: 'unknown',
+      reason: 'no_data',
+      mode: null,
+    });
+
+    const active = await loadActiveAlarmFacts(api);
+    expect(active.filter((alarm) => alarm.deviceCode === 'RC-112')).toEqual([
+      { deviceCode: 'RC-112', metricKey: 'evap_temp_c' },
+    ]);
+
+    const raised = await countAlarmsRaisedSince(api, updatedAt);
+    expect(raised['evap_temp_c']).toBe(2);
   });
 });

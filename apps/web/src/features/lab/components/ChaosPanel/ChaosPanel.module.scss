@@ -1,0 +1,132 @@
+@mixin device-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  align-content: center;
+  height: 52px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--mui-palette-divider);
+  border-radius: 8px;
+  color: var(--mui-palette-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--mui-palette-primary-main);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mui-palette-primary-main);
+    outline-offset: 2px;
+  }
+}
+
+.chaos {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 40px;
+  }
+
+  &__title {
+    display: grid;
+    min-width: 0;
+  }
+
+  &__notice {
+    align-items: flex-start;
+  }
+
+  &__hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  &__line {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--mui-palette-divider);
+  }
+
+  &__switches {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__devices {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 6px;
+  }
+
+  &__device {
+    @include device-button;
+
+    background: transparent;
+  }
+
+  &__device_selected {
+    @include device-button;
+
+    border-color: var(--mui-palette-primary-main);
+    background: var(--mui-palette-action-selected);
+  }
+
+  &__code {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__count {
+    min-width: 18px;
+    color: var(--mui-palette-error-main);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__name {
+    grid-column: 1 / -1;
+    overflow: hidden;
+    color: var(--mui-palette-text-secondary);
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__target {
+    display: grid;
+    gap: 4px;
+    padding: 8px 10px;
+    border-left: 3px solid var(--mui-palette-primary-main);
+    border-radius: 4px;
+    background: var(--mui-palette-action-hover);
+  }
+
+  &__target-title {
+    font-weight: 600;
+  }
+}

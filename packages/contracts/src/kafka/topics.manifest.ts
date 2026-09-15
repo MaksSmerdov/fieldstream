@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { telemetryRawSchema, telemetryReadingSchema } from '../messages/telemetry.js';
 import { alarmEventSchema } from '../messages/alarms.js';
 import { commandResultSchema, deviceCommandSchema } from '../messages/commands.js';
+import { lineStatusSchema } from '../messages/collector.js';
 import { deviceStateSchema, pollCycleSchema } from '../messages/events.js';
 
 /**
@@ -20,6 +21,11 @@ export interface TopicSpec<S extends z.ZodTypeAny> {
   readonly configs?: Readonly<Record<string, string>>;
   /** Сервис, которому разрешено писать в топик. Двух писателей быть не должно. */
   readonly owner: string;
+  /**
+   * Сервис, который возвращает сообщения из очереди недоставленных в этот топик с исходным ключом.
+   * Единственное исключение из правила одного писателя: пишутся только исходные байты, а не новые данные.
+   */
+  readonly redriver?: string;
   readonly why: string;
 }
 
@@ -43,17 +49,37 @@ export const TOPICS = {
     retentionMs: 7 * DAY_MS,
     configs: { 'compression.type': 'gzip' },
     owner: 'edge-collector',
-    why: 'Семь дней это окно реплея: сырые кадры позволяют переиграть историю исправленным декодером.',
+    redriver: 'stream-processor',
+    why:
+      'Семь дней это окно реплея: сырые кадры позволяют переиграть историю исправленным декодером. ' +
+      'Процессор возвращает сюда сообщения из очереди недоставленных с исходным ключом: ' +
+      'это единственное исключение из правила одного писателя.',
   }),
   pollCycles: define({
-    name: 'fieldstream.collector.cycles.v1',
+    name: 'fieldstream.collector.cycles.v2',
     schema: pollCycleSchema,
-    keyOf: (p) => p.lineCode,
-    partitions: 3,
+    keyOf: (p) => p.deviceCode,
+    partitions: 6,
     cleanupPolicy: 'delete',
     retentionMs: 3 * DAY_MS,
     owner: 'edge-collector',
-    why: 'Пишется даже когда прибор не ответил и кадра нет: иначе отказ невидим.',
+    why:
+      'Пишется даже когда прибор не ответил и кадра нет: иначе отказ невидим. ' +
+      'Ключ и число партиций как у сырых кадров: цикл прибора ложится в партицию с тем же номером, ' +
+      'что и его кадры, и оба потока одного прибора обрабатывает один экземпляр процессора.',
+  }),
+  lineStatus: define({
+    name: 'fieldstream.collector.status.v1',
+    schema: lineStatusSchema,
+    keyOf: (p) => p.lineCode,
+    partitions: 3,
+    cleanupPolicy: 'compact',
+    retentionMs: null,
+    configs: { 'segment.ms': '60000', 'min.cleanable.dirty.ratio': '0.1' },
+    owner: 'edge-collector',
+    why:
+      'Снимок линии: размыкатели, лестница переподключения, сторож цикла и время ответа. ' +
+      'Сборщик стоит за NAT, поэтому его состояние едет топиком, а компакция хранит последний снимок линии.',
   }),
   telemetryReadings: define({
     name: 'fieldstream.telemetry.readings.v1',
@@ -151,4 +177,5 @@ export const KAFKA_HEADERS = Object.freeze({
   dlqAttempt: 'x-dlq-attempt',
   dlqFirstFailedAt: 'x-dlq-first-failed-at',
   dlqConsumerGroup: 'x-dlq-consumer-group',
+  dlqRedriveOf: 'x-dlq-redrive-of',
 });

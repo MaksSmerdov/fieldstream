@@ -16,7 +16,8 @@ import { createSimulator } from '../../src/simulator.js';
 import type { Simulator } from '../../src/simulator.js';
 import { lineTimeMs } from '../../src/modbus/frame.js';
 import { createLineServer } from '../../src/modbus/line-server.js';
-import type { LineServer } from '../../src/modbus/line-server.js';
+import type { LineServer, LineServerOptions } from '../../src/modbus/line-server.js';
+import { createTurnaround } from '../../src/modbus/turnaround.js';
 
 /** Библиотека отдаёт конструктор через module.exports, а её типы описывают его как default. */
 const ModbusRTU = modbusSerial as unknown as typeof modbusSerial.default;
@@ -34,8 +35,12 @@ interface Bench {
   readonly server: LineServer;
 }
 
-/** Стенд и порт линии L1 на свободном порту. Скорость линии задаётся для замеров очереди. */
-const startBench = async (baud = 115_200): Promise<Bench> => {
+type Turnaround = Pick<LineServerOptions, 'turnaroundMs' | 'turnaroundJitterMs'>;
+
+const NO_TURNAROUND: Turnaround = { turnaroundMs: 0, turnaroundJitterMs: 0 };
+
+/** Стенд и порт линии L1 на свободном порту. Скорость и задержка ответа задаются для замеров. */
+const startBench = async (baud = 115_200, turnaround = NO_TURNAROUND): Promise<Bench> => {
   const sim = createSimulator({
     stand: DEMO_STAND,
     seed: 'line-test',
@@ -48,7 +53,8 @@ const startBench = async (baud = 115_200): Promise<Bench> => {
     host: '127.0.0.1',
     port: 0,
     baud,
-    turnaroundMs: 0,
+    seed: 'line-test',
+    ...turnaround,
     busTimeoutMs: 20,
     answer: (request) => sim.answer('L1', request),
     isOnline: () => sim.isLineOnline('L1'),
@@ -172,6 +178,48 @@ describe('порт линии и клиент modbus-serial', () => {
     await Promise.all([first.readInputRegisters(0, 4), second.readInputRegisters(0, 4)]);
 
     expect(performance.now() - started).toBeGreaterThanOrEqual(2 * oneExchangeMs - 5);
+  });
+
+  it('каждый ответ ждёт свою добавку разброса из последовательности линии', async () => {
+    const baud = 115_200;
+    const { server } = await startBench(baud, { turnaroundMs: 10, turnaroundJitterMs: 200 });
+    const client = await connect(server.port(), 1, 2000);
+    const next = createTurnaround({ seed: 'line-test', lineCode: 'L1', baseMs: 10, jitterMs: 200 });
+    const expected = Array.from({ length: 8 }, () => next());
+    const frameMs = lineTimeMs(8 + 5 + 2 * 4, baud);
+
+    expect(Math.max(...expected) - Math.min(...expected)).toBeGreaterThan(50);
+
+    for (const delayMs of expected) {
+      const started = performance.now();
+      await client.readInputRegisters(0, 4);
+      const elapsed = performance.now() - started;
+
+      expect(elapsed).toBeGreaterThanOrEqual(frameMs + delayMs - 2);
+      expect(elapsed).toBeLessThan(frameMs + delayMs + 60);
+    }
+  });
+
+  it('зависший обмен не получает добавку разброса', async () => {
+    const { sim, server } = await startBench(115_200, {
+      turnaroundMs: 0,
+      turnaroundJitterMs: 1000,
+    });
+    sim.applyFault(fault({ targetKind: 'device', targetId: 'RC-101', kind: 'stall' }));
+    const client = await connect(server.port(), 1, 2000);
+    const next = createTurnaround({ seed: 'line-test', lineCode: 'L1', baseMs: 0, jitterMs: 1000 });
+    const skipped = Array.from({ length: 3 }, () => next());
+
+    expect(Math.max(...skipped)).toBeGreaterThan(150);
+
+    for (let attempt = 0; attempt < skipped.length; attempt += 1) {
+      const started = performance.now();
+      await client.readInputRegisters(0, 4);
+      const elapsed = performance.now() - started;
+
+      expect(elapsed).toBeGreaterThanOrEqual(398);
+      expect(elapsed).toBeLessThan(400 + 150);
+    }
   });
 
   it('обрыв шлюза закрывает порт, после снятия поломки порт открывается снова', async () => {

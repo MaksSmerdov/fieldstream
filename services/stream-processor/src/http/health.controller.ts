@@ -1,6 +1,5 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
-import { CyclesConsumerService } from '../ingest/cycles-consumer.service.js';
-import { RawConsumerService } from '../ingest/raw-consumer.service.js';
+import { IngestConsumerService } from '../ingest/ingest-consumer.service.js';
 import { ProducerService } from '../publish/producer.service.js';
 import { DeviceRefsService } from '../topology/device-refs.service.js';
 
@@ -11,14 +10,13 @@ interface Readiness {
   readonly consumers: boolean;
 }
 
-/** Живость и готовность. Готов, когда есть связь с Kafka, топология загружена и потребители работают. */
+/** Живость и готовность. Готов, когда есть связь с Kafka, топология загружена и потребитель кадров и циклов работает. */
 @Controller('health')
 export class HealthController {
   public constructor(
     private readonly producer: ProducerService,
     private readonly refs: DeviceRefsService,
-    private readonly raw: RawConsumerService,
-    private readonly cycles: CyclesConsumerService,
+    private readonly ingest: IngestConsumerService,
   ) {}
 
   @Get('live')
@@ -30,7 +28,7 @@ export class HealthController {
   public ready(): Readiness {
     const kafka = this.producer.isConnected();
     const topology = this.refs.isLoaded();
-    const consumers = this.raw.isRunning() && this.cycles.isRunning();
+    const consumers = this.ingest.isRunning();
     const readiness: Readiness = {
       status: kafka && topology && consumers ? 'ready' : 'starting',
       kafka,

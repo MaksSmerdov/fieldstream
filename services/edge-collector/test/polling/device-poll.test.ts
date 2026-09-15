@@ -24,6 +24,8 @@ describe('опрос прибора', () => {
     expect(result.ok).toBe(true);
     expect(result.requestCount).toBe(plan.requestCount);
     expect(result.durationMs).toBe(10 * plan.requestCount);
+    expect(result.requestDurationsMs).toEqual(plan.blocks.map(() => 10));
+    expect(result.timedOut).toBe(false);
     expect(result.blocks.map((block) => block.startAddress)).toEqual(
       plan.blocks.map((block) => block.startAddress),
     );
@@ -44,8 +46,26 @@ describe('опрос прибора', () => {
       createFakeClock(0),
     );
 
-    expect(result).toMatchObject({ ok: false, errorKind: 'timeout', requestCount: 2 });
+    expect(result).toMatchObject({
+      ok: false,
+      errorKind: 'timeout',
+      requestCount: 2,
+      timedOut: true,
+    });
     expect(result.blocks).toHaveLength(1);
+    expect(result.requestDurationsMs).toHaveLength(1);
     expect(calls).toBe(2);
+  });
+
+  it('обрыв связи таймаутом не считается', async () => {
+    const result = await pollDevice(
+      () => Promise.reject(Object.assign(new Error('Port Not Open'), { errno: 'ECONNREFUSED' })),
+      4,
+      plan,
+      createFakeClock(0),
+    );
+
+    expect(result).toMatchObject({ ok: false, errorKind: 'disconnected', timedOut: false });
+    expect(result.requestDurationsMs).toEqual([]);
   });
 });

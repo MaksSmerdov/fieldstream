@@ -31,7 +31,7 @@ const signIn = async (page) => {
 };
 
 /** Кадры GIF копятся в памяти сырыми пикселями: перекодировать их в файлы незачем. */
-const frames = [];
+let frames = [];
 
 const grab = async (page) => {
   const png = PNG.sync.read(await page.screenshot({ type: 'png' }));
@@ -46,6 +46,17 @@ const record = async (page, seconds, action) => {
     await sleep(GIF.frameMs);
   }
   await running;
+};
+
+/** Кадры, пока на экране не появится ожидаемое, но не дольше предела: ролик не зависает на сломанном стенде. */
+const recordUntil = async (page, locator, seconds) => {
+  const until = Date.now() + seconds * 1000;
+  while (Date.now() < until) {
+    await grab(page);
+    if (await locator.isVisible()) return true;
+    await sleep(GIF.frameMs);
+  }
+  return false;
 };
 
 const encodeGif = async (path) => {
@@ -98,6 +109,22 @@ const main = async () => {
   await page.getByRole('heading', { name: 'Алармы' }).waitFor();
   await sleep(1500);
   await page.screenshot({ path: join(OUT, 'alarms.png') });
+
+  await page.goto(`${BASE}/pipeline`);
+  await page.getByRole('region', { name: 'Группа fs-processor', exact: true }).waitFor();
+  await sleep(5000);
+  await page.screenshot({ path: join(OUT, 'pipeline.png') });
+
+  await page.goto(`${BASE}/lab`);
+  await page.getByText('Время ответа').waitFor();
+  await sleep(2000);
+  await page.screenshot({ path: join(OUT, 'lab.png') });
+
+  const scenarios = page.getByRole('region', { name: 'Сценарии', exact: true });
+  await scenarios.getByRole('button', { name: 'Запустить' }).first().waitFor();
+  await scenarios.scrollIntoViewIfNeeded();
+  await sleep(800);
+  await page.screenshot({ path: join(OUT, 'scenarios.png') });
   await shots.close();
 
   // Ролик: обзор с живыми значениями, переход на прибор, смена окна графика
@@ -120,11 +147,33 @@ const main = async () => {
     await stage.getByRole('heading', { name: 'Алармы' }).waitFor();
   });
   await record(stage, 2);
+  await encodeGif(join(OUT, 'tour.gif'));
+  const tourFrames = frames.length;
+  frames = [];
+
+  await stage.goto(`${BASE}/lab?device=RC-105`);
+  await stage.getByRole('heading', { name: 'Прибор RC-105 на линии L2' }).waitFor();
+  const silent = stage
+    .getByRole('group', { name: 'Поломки прибора RC-105' })
+    .getByRole('switch', { name: 'молчит' });
+  await sleep(1500);
+  await record(stage, 2);
+  await silent.click();
+  try {
+    const opened = await recordUntil(stage, stage.getByText('разомкнут', { exact: true }), 45);
+    if (!opened) process.stdout.write('размыкатель не разомкнулся за 45 с, ролик неполный\n');
+    await record(stage, 3);
+  } finally {
+    await silent.click();
+  }
+  await record(stage, 2);
   await film.close();
   await browser.close();
 
-  await encodeGif(join(OUT, 'tour.gif'));
-  process.stdout.write(`снято: 6 картинок и ролик из ${String(frames.length)} кадров\n`);
+  await encodeGif(join(OUT, 'lab.gif'));
+  process.stdout.write(
+    `снято: 9 картинок, обзор из ${String(tourFrames)} кадров, отказы из ${String(frames.length)} кадров\n`,
+  );
 };
 
 await main();

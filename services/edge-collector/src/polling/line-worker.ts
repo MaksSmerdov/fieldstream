@@ -1,4 +1,12 @@
-import type { ErrorKind, PollCycle, Stand, StandLine, TelemetryRaw } from '@fieldstream/contracts';
+import type {
+  ErrorKind,
+  LineStatus,
+  PollCycle,
+  ReconnectStep,
+  Stand,
+  StandLine,
+  TelemetryRaw,
+} from '@fieldstream/contracts';
 import { buildDeviceReadPlan, profileByKey } from '@fieldstream/device-profiles';
 import type { PlanMode, ReadPlan } from '@fieldstream/device-profiles';
 import { toIsoTimestamp } from '@fieldstream/domain';
@@ -19,8 +27,9 @@ import { classifyError, needsReconnect } from '../transport/errors.js';
 import type { ModbusLink } from '../transport/modbus-link.js';
 import { HardTimeoutError, cycleWatchdogMs, withHardTimeout } from '../transport/timeouts.js';
 import { pollDevice } from './device-poll.js';
-import { buildPollCycle, buildRawFrame, newTraceId } from './frames.js';
+import { buildLineStatus, buildPollCycle, buildRawFrame, newTraceId } from './frames.js';
 import type { DeviceContext } from './frames.js';
+import { createLatencyTracker } from './latency.js';
 
 /** Итог одного обхода линии. */
 export interface CycleReport {
@@ -42,13 +51,7 @@ export interface LineSnapshot {
   readonly running: boolean;
   readonly connected: boolean;
   readonly reconnectAttempt: number;
-  readonly lastCycle: {
-    readonly at: string;
-    readonly outcome: CycleReport['outcome'];
-    readonly durationMs: number;
-    readonly polled: number;
-    readonly failed: number;
-  } | null;
+  readonly lastCycle: LineStatus['lastCycle'];
   readonly plans: readonly {
     readonly profileKey: string;
     readonly requestCount: number;
@@ -73,9 +76,12 @@ export interface LineWorkerOptions {
   readonly log: Logger;
   readonly publishRaw: (frame: TelemetryRaw) => void;
   readonly publishCycle: (cycle: PollCycle) => void;
+  readonly publishStatus: (status: LineStatus) => void;
   readonly onPoll?: (errorKind: ErrorKind | null) => void;
+  readonly onRequest?: (durationMs: number) => void;
   readonly onCycle?: (report: CycleReport, openBreakers: number) => void;
   readonly onReconnect?: () => void;
+  readonly onWatchdogTrip?: () => void;
   readonly sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
 }
 
@@ -89,6 +95,7 @@ export interface LineWorker {
   readonly setPlanMode: (mode: PlanMode) => void;
   readonly setPollInterval: (ms: number) => void;
   readonly snapshot: () => LineSnapshot;
+  readonly status: () => LineStatus;
 }
 
 interface DeviceSlot {
@@ -97,6 +104,7 @@ interface DeviceSlot {
 }
 
 const WATCHDOG_RETRY_MS = 1_000;
+const RECONNECT_HISTORY = 12;
 
 /** Пауза, которую прерывает остановка воркера. */
 const abortableSleep = (ms: number, signal: AbortSignal): Promise<void> =>
@@ -153,9 +161,14 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
   const slots = lineSlots(options.stand, line);
   const throttle = createLogThrottle(clock);
   const plans = new Map<string, ReadPlan>();
+  const latency = createLatencyTracker();
   let planMode: PlanMode = 'merged';
   let pollIntervalMs = line.pollIntervalMs;
   let reconnectAttempt = 0;
+  let reconnects: readonly ReconnectStep[] = [];
+  let cycleStartedAt: number | null = null;
+  let cycleLimitMs: number | null = null;
+  let watchdogTrips = 0;
   let generation = 0;
   let lastCycle: LineSnapshot['lastCycle'] = null;
   let running = false;
@@ -173,10 +186,31 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
     return plan;
   };
 
-  const breakerFacts = (breaker: Breaker, now: number): PollCycle['breaker'] & {} => ({
-    state: breakerView(breaker, now),
-    nextProbeAt: breaker.nextProbeAt === null ? null : toIsoTimestamp(breaker.nextProbeAt),
-  });
+  /** Снимок линии на момент now. */
+  const statusAt = (now: number): LineStatus =>
+    buildLineStatus(
+      {
+        lineCode: line.code,
+        running,
+        connected: link.isOpen(),
+        planMode,
+        pollIntervalMs,
+        requestTimeoutMs: line.requestTimeoutMs,
+        cycleStartedAt,
+        watchdogLimitMs: cycleLimitMs ?? cycleWatchdogMs(pollIntervalMs),
+        watchdogTrips,
+        lastCycle,
+        reconnects,
+        devices: slots.map((slot) => ({ device: slot.context.device, breaker: slot.breaker })),
+        latency: latency.summary(),
+      },
+      now,
+    );
+
+  /** Публикует снимок линии. */
+  const publishStatus = (now: number = clock.now()): void => {
+    options.publishStatus(statusAt(now));
+  };
 
   const logFailure = (slot: DeviceSlot, errorKind: ErrorKind, error: unknown): void => {
     const decision = throttle(`${slot.context.device.code}:${errorKind}`);
@@ -193,7 +227,10 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
     );
   };
 
-  /** Отказ, при котором до прибора не дошёл ни один запрос: порт шлюза недоступен. */
+  /**
+   * Отказ, при котором до прибора не дошёл ни один запрос: порт шлюза недоступен. Это отказ
+   * линии, а не прибора, поэтому размыкатели не трогаются и паузу задаёт лестница переподключения.
+   */
   const reportUnreachable = (
     due: readonly DeviceSlot[],
     error: unknown,
@@ -204,7 +241,6 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
     const errorKind = classifyError(error);
 
     for (const slot of due) {
-      slot.breaker = recordFailure(slot.breaker, now);
       options.onPoll?.(errorKind);
       options.publishCycle(
         buildPollCycle(
@@ -228,7 +264,7 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
     }
   };
 
-  /** Открывает порт, если он закрыт. При неудаче возвращает выбранную задержку переподключения. */
+  /** Открывает порт, если он закрыт. При неудаче запоминает шаг лестницы и возвращает его. */
   const ensureLink = async (): Promise<{ step: BackoffStep; error: unknown } | null> => {
     if (link.isOpen()) return null;
 
@@ -240,6 +276,16 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
       return null;
     } catch (error) {
       const step = reconnectDelay(reconnectAttempt, options.random);
+      reconnects = [
+        ...reconnects,
+        {
+          attempt: reconnectAttempt,
+          at: toIsoTimestamp(clock.now()),
+          baseMs: step.baseMs,
+          jitterMs: step.jitterMs,
+          chosenMs: step.chosenMs,
+        },
+      ].slice(-RECONNECT_HISTORY);
       reconnectAttempt += 1;
       if (throttle(`connect:${classifyError(error)}`).pass) {
         log.warn(
@@ -251,17 +297,34 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
     }
   };
 
-  const runCycle = async (): Promise<CycleReport> => {
+  /** Пауза простоя: такт опроса, но не дольше, чем до ближайшей пробы размыкателя. */
+  const idleDelayMs = (now: number): number => {
+    const nextProbeAt = Math.min(
+      ...slots.map((slot) => slot.breaker.nextProbeAt ?? Number.POSITIVE_INFINITY),
+    );
+    return Math.min(pollIntervalMs, Math.max(0, nextProbeAt - now));
+  };
+
+  /** Проход по приборам линии, которым сейчас можно обращаться. */
+  const pollLine = async (startedAt: number): Promise<CycleReport> => {
     const cycleGeneration = generation;
-    const startedAt = clock.now();
     const traceId = newTraceId();
     const due = slots.filter((slot) => breakerAllows(slot.breaker, startedAt));
     let polled = 0;
     let failed = 0;
 
     if (due.length === 0) {
-      return { outcome: 'idle', durationMs: 0, polled, failed, nextDelayMs: pollIntervalMs };
+      return {
+        outcome: 'idle',
+        durationMs: 0,
+        polled,
+        failed,
+        nextDelayMs: idleDelayMs(startedAt),
+      };
     }
+
+    cycleStartedAt = startedAt;
+    publishStatus(startedAt);
 
     for (const [index, slot] of due.entries()) {
       if (cycleGeneration !== generation) break;
@@ -285,6 +348,12 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
         clock,
       );
       if (cycleGeneration !== generation) break;
+
+      for (const durationMs of poll.requestDurationsMs) {
+        latency.record({ kind: 'ok', durationMs });
+        options.onRequest?.(durationMs);
+      }
+      if (poll.timedOut) latency.record({ kind: 'timeout' });
 
       const now = clock.now();
       slot.breaker = poll.ok ? recordSuccess() : recordFailure(slot.breaker, now);
@@ -329,26 +398,50 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
     };
   };
 
-  /** Обход под сторожевым таймером: зависший обход бросается, соединение рвётся принудительно. */
-  const guardedCycle = async (): Promise<CycleReport> => {
+  /**
+   * Обход под сторожевым таймером: лимит фиксируется на старте обхода, зависший обход бросается,
+   * соединение рвётся принудительно.
+   */
+  const guardedCycle = async (startedAt: number): Promise<CycleReport> => {
+    const limitMs = cycleWatchdogMs(pollIntervalMs);
+    cycleLimitMs = limitMs;
     try {
-      return await withHardTimeout(runCycle(), cycleWatchdogMs(pollIntervalMs));
+      return await withHardTimeout(pollLine(startedAt), limitMs);
     } catch (error) {
       generation += 1;
       link.destroy();
       if (error instanceof HardTimeoutError) {
+        watchdogTrips += 1;
+        options.onWatchdogTrip?.();
         log.error({ line: line.code }, 'сторож цикла: обход завис, соединение разорвано');
       } else {
         log.error({ line: line.code, err: error }, 'сбой обхода линии');
       }
       return {
         outcome: 'watchdog',
-        durationMs: 0,
+        durationMs: Math.max(0, clock.now() - startedAt),
         polled: 0,
         failed: 0,
         nextDelayMs: WATCHDOG_RETRY_MS,
       };
     }
+  };
+
+  /** Обход целиком: запоминает его итог и публикует снимок линии после него. */
+  const runCycle = async (): Promise<CycleReport> => {
+    const report = await guardedCycle(clock.now());
+    const now = clock.now();
+    cycleStartedAt = null;
+    cycleLimitMs = null;
+    lastCycle = {
+      at: toIsoTimestamp(now),
+      outcome: report.outcome,
+      durationMs: report.durationMs,
+      polled: report.polled,
+      failed: report.failed,
+    };
+    publishStatus(now);
+    return report;
   };
 
   /** Работает ли воркер прямо сейчас: остановка может прийти во время любого ожидания. */
@@ -357,14 +450,7 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
   /** Цикл живёт до остановки или до следующего запуска: свой номер он проверяет сам. */
   const runLoop = async (myRun: number): Promise<void> => {
     while (isRunning() && runId === myRun) {
-      const report = await guardedCycle();
-      lastCycle = {
-        at: toIsoTimestamp(clock.now()),
-        outcome: report.outcome,
-        durationMs: report.durationMs,
-        polled: report.polled,
-        failed: report.failed,
-      };
+      const report = await runCycle();
       options.onCycle?.(report, slots.filter((slot) => slot.breaker.open).length);
       if (isRunning() && runId === myRun) await sleep(report.nextDelayMs, abort.signal);
     }
@@ -400,6 +486,7 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
         if (!isRunning()) {
           loop = null;
           link.destroy();
+          publishStatus();
         }
         stopping = null;
       })();
@@ -407,11 +494,15 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
       return stopping;
     },
     isRunning,
+    /** Режим плана действует со следующего обхода, снимок уходит сразу. */
     setPlanMode: (mode) => {
       planMode = mode;
+      publishStatus();
     },
+    /** Такт опроса действует со следующего обхода, снимок уходит сразу. */
     setPollInterval: (ms) => {
       pollIntervalMs = ms;
+      publishStatus();
     },
     snapshot: () => {
       const now = clock.now();
@@ -439,11 +530,13 @@ export const createLineWorker = (options: LineWorkerOptions): LineWorker => {
         devices: slots.map((slot) => ({
           deviceCode: slot.context.device.code,
           slaveId: slot.context.device.slaveId,
-          ...breakerFacts(slot.breaker, now),
           breaker: breakerView(slot.breaker, now),
           failures: slot.breaker.failures,
+          nextProbeAt:
+            slot.breaker.nextProbeAt === null ? null : toIsoTimestamp(slot.breaker.nextProbeAt),
         })),
       };
     },
+    status: () => statusAt(clock.now()),
   };
 };

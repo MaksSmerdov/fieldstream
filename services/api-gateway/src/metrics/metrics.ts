@@ -1,5 +1,12 @@
 import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from '@prometheus-io/client';
 
+export interface ConsumerLagSample {
+  readonly group: string;
+  readonly topic: string;
+  readonly partition: number;
+  readonly lag: number;
+}
+
 /** Метрики шлюза в формате Prometheus. */
 export interface GatewayMetrics {
   readonly registry: Registry;
@@ -7,6 +14,7 @@ export interface GatewayMetrics {
   readonly setStreams: (count: number) => void;
   readonly observeEvent: (kind: string) => void;
   readonly observeResync: (reason: string) => void;
+  readonly setConsumerLag: (samples: readonly ConsumerLagSample[]) => void;
 }
 
 /** Реестр метрик процесса: свои счётчики плюс стандартные метрики Node. */
@@ -38,6 +46,12 @@ export const createMetrics = (): GatewayMetrics => {
     labelNames: ['reason'],
     registers: [registry],
   });
+  const consumerLag = new Gauge({
+    name: 'fieldstream_consumer_lag',
+    help: 'Отставание группы потребителей по партиции на последнем опросе брокера',
+    labelNames: ['group', 'topic', 'partition'],
+    registers: [registry],
+  });
 
   return {
     registry,
@@ -52,6 +66,15 @@ export const createMetrics = (): GatewayMetrics => {
     },
     observeResync: (reason) => {
       resyncs.inc({ reason });
+    },
+    setConsumerLag: (samples) => {
+      consumerLag.reset();
+      for (const sample of samples) {
+        consumerLag.set(
+          { group: sample.group, topic: sample.topic, partition: sample.partition },
+          sample.lag,
+        );
+      }
     },
   };
 };
