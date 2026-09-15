@@ -1,0 +1,30 @@
+.replay {
+  &__header {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  &__intro {
+    max-width: 880px;
+    overflow-wrap: anywhere;
+  }
+
+  &__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 16px;
+
+    @media (min-width: 1100px) {
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+    }
+  }
+
+  &__run {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+    margin-top: 16px;
+  }
+}

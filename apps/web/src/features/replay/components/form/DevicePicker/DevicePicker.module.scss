@@ -1,0 +1,78 @@
+.picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+  }
+
+  &__count {
+    color: var(--mui-palette-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+  }
+
+  &__devices {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 6px;
+  }
+
+  &__device {
+    display: grid;
+    align-content: center;
+    min-width: 0;
+    height: 48px;
+    padding: 4px 8px;
+    border: 1px solid var(--mui-palette-divider);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--mui-palette-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: var(--mui-palette-primary-main);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--mui-palette-primary-main);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      color: var(--mui-palette-text-secondary);
+      cursor: default;
+    }
+
+    &_selected {
+      border-color: var(--mui-palette-primary-main);
+      background: var(--mui-palette-action-selected);
+    }
+  }
+
+  &__code {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__name {
+    overflow: hidden;
+    color: var(--mui-palette-text-secondary);
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

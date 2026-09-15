@@ -12,22 +12,38 @@ const list = z
       .filter((item) => item.length > 0),
   );
 
-const envSchema = z.object({
-  KAFKA_BROKERS: list.default('localhost:29092'),
-  KAFKA_CLIENT_ID: z.string().min(1).default('stream-processor'),
-  PROCESSOR_INSTANCE_ID: z.string().min(1).optional(),
-  DATABASE_HOST: z.string().min(1).default('localhost'),
-  DATABASE_PORT: port.default(5432),
-  POSTGRES_DB: z.string().min(1).default('fieldstream'),
-  FS_INGEST_PASSWORD: z.string().min(1, 'пароль обязателен, значения по умолчанию нет'),
-  PROCESSOR_HOST: z.string().min(1).default('0.0.0.0'),
-  PROCESSOR_HTTP_PORT: port.default(8092),
-  HEALTH_INTERVAL_MS: z.coerce.number().int().min(1_000).max(60_000).default(5_000),
-  ALARM_RULES_REFRESH_MS: z.coerce.number().int().min(1_000).max(300_000).default(10_000),
-  DLQ_REDRIVE: z.enum(['on', 'off']).default('on'),
-  DLQ_REDRIVE_POLL_MS: z.coerce.number().int().min(100).max(60_000).default(1_000),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
-});
+const envSchema = z
+  .object({
+    KAFKA_BROKERS: list.default('localhost:29092'),
+    KAFKA_CLIENT_ID: z.string().min(1).default('stream-processor'),
+    PROCESSOR_INSTANCE_ID: z.string().min(1).optional(),
+    DATABASE_HOST: z.string().min(1).default('localhost'),
+    DATABASE_PORT: port.default(5432),
+    POSTGRES_DB: z.string().min(1).default('fieldstream'),
+    FS_INGEST_PASSWORD: z.string().min(1, 'пароль обязателен, значения по умолчанию нет'),
+    PROCESSOR_HOST: z.string().min(1).default('0.0.0.0'),
+    PROCESSOR_HTTP_PORT: port.default(8092),
+    HEALTH_INTERVAL_MS: z.coerce.number().int().min(1_000).max(60_000).default(5_000),
+    ALARM_RULES_REFRESH_MS: z.coerce.number().int().min(1_000).max(300_000).default(10_000),
+    DLQ_REDRIVE: z.enum(['on', 'off']).default('on'),
+    DLQ_REDRIVE_POLL_MS: z.coerce.number().int().min(100).max(60_000).default(1_000),
+    REPLAY: z.enum(['on', 'off']).default('on'),
+    REPLAY_POLL_MS: z.coerce.number().int().min(100).max(60_000).default(2_000),
+    REPLAY_HEARTBEAT_MS: z.coerce.number().int().min(100).max(30_000).default(2_000),
+    REPLAY_STALE_MS: z.coerce.number().int().min(1_000).max(600_000).default(60_000),
+    REPLAY_MAX_MS: z.coerce.number().int().min(1_000).max(3_600_000).default(600_000),
+    LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+  })
+  .superRefine((env, ctx) => {
+    if (env.REPLAY_STALE_MS < env.REPLAY_HEARTBEAT_MS * 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'пульс перепрогона должен укладываться в срок протухания хотя бы трижды, иначе живой прогон сочтут брошенным',
+        path: ['REPLAY_STALE_MS'],
+      });
+    }
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

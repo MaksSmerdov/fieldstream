@@ -59,6 +59,31 @@ describe('общая шкала графика', () => {
     expect(alignSeries([withGap]).ys[0]).toEqual([null, -20]);
   });
 
+  it('часы без точек разрывают кривую пустой точкой, а короткий пропуск бакета нет', () => {
+    const minute = 60_000;
+    const outage: SeriesMetric = {
+      metricKey: 'evap_temp_c',
+      points: [
+        point('2026-02-11T10:00:00.000Z', -25),
+        point('2026-02-11T10:02:00.000Z', -25),
+        point('2026-02-11T13:00:00.000Z', -25),
+      ],
+    };
+
+    const { xs, ys } = alignSeries([outage], minute);
+
+    expect(xs).toEqual(
+      [
+        '2026-02-11T10:00:00.000Z',
+        '2026-02-11T10:02:00.000Z',
+        '2026-02-11T10:03:00.000Z',
+        '2026-02-11T13:00:00.000Z',
+      ].map((t) => Date.parse(t) / 1000),
+    );
+    expect(ys[0]).toEqual([-25, -25, null, -25]);
+    expect(alignSeries([outage]).ys[0]).toEqual([-25, -25, -25]);
+  });
+
   it('пустой ответ даёт пустую шкалу, а не одну точку', () => {
     expect(alignSeries([{ metricKey: 'supply_temp_c', points: [] }])).toEqual({
       xs: [],

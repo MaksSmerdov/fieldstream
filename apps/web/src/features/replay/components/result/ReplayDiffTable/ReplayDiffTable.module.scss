@@ -1,0 +1,92 @@
+.diff {
+  overflow-x: auto;
+
+  &:focus-visible {
+    outline: 2px solid var(--mui-palette-primary-main);
+    outline-offset: 2px;
+  }
+
+  &__table {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+
+    th,
+    td {
+      height: 44px;
+      padding: 4px 10px;
+      border-bottom: 1px solid var(--mui-palette-divider);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    thead th {
+      height: 36px;
+      color: var(--mui-palette-text-secondary);
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    tbody tr:last-child th,
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+  }
+
+  &__row_selected th:first-child,
+  &__row_selected td:first-child {
+    box-shadow: inset 3px 0 0 var(--mui-palette-primary-main);
+  }
+
+  &__pick {
+    min-width: 72px;
+    min-height: 32px;
+    padding: 2px 8px;
+    border: 1px solid var(--mui-palette-divider);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--mui-palette-primary-main);
+    font: inherit;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--mui-palette-primary-main);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--mui-palette-primary-main);
+      outline-offset: 2px;
+    }
+
+    &[aria-pressed='true'] {
+      border-color: var(--mui-palette-primary-main);
+      box-shadow: inset 0 0 0 1px var(--mui-palette-primary-main);
+    }
+  }
+
+  &__label {
+    min-width: 160px;
+  }
+
+  &__number {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+
+    &_added {
+      color: var(--mui-palette-error-main);
+      font-weight: 600;
+    }
+
+    &_removed {
+      color: var(--mui-palette-success-main);
+      font-weight: 600;
+    }
+  }
+}

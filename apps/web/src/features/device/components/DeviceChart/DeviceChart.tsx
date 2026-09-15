@@ -69,7 +69,15 @@ export const DeviceChart = ({ code, params }: Props): React.JSX.Element => {
     [series.metrics, byKey],
   );
 
-  const data = useMemo(() => alignSeries(shown.map((item) => item.metric)), [shown]);
+  const bucketMs = series.meta?.bucketMs;
+  const data = useMemo(
+    () =>
+      alignSeries(
+        shown.map((item) => item.metric),
+        bucketMs,
+      ),
+    [shown, bucketMs],
+  );
 
   const bands = useMemo<ChartBand[]>(
     () =>

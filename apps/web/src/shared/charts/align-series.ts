@@ -6,11 +6,15 @@ export interface AlignedSeries {
   readonly ys: (number | null)[][];
 }
 
+/** Сколько шагов бакета без точек подряд считается разрывом, а не случайно пустым бакетом. */
+const GAP_BUCKETS = 3;
+
 /**
  * Общая шкала для нескольких метрик: у одной может не быть точки в бакете, где у соседней она
- * есть. Пропуск остаётся пропуском, иначе график соединит прямой часы без данных.
+ * есть. Пропуск остаётся пропуском: разрыв длиннее GAP_BUCKETS шагов получает пустую точку,
+ * иначе график соединит прямой часы без данных.
  */
-export const alignSeries = (metrics: readonly SeriesMetric[]): AlignedSeries => {
+export const alignSeries = (metrics: readonly SeriesMetric[], bucketMs?: number): AlignedSeries => {
   const stamps = new Set<number>();
 
   for (const metric of metrics) {
@@ -20,7 +24,18 @@ export const alignSeries = (metrics: readonly SeriesMetric[]): AlignedSeries => 
     }
   }
 
-  const sorted = [...stamps].sort((left, right) => left - right);
+  const sorted: number[] = [];
+  for (const atMs of [...stamps].sort((left, right) => left - right)) {
+    const previous = sorted.at(-1);
+    if (
+      bucketMs !== undefined &&
+      previous !== undefined &&
+      atMs - previous > GAP_BUCKETS * bucketMs
+    ) {
+      sorted.push(previous + bucketMs);
+    }
+    sorted.push(atMs);
+  }
   const index = new Map(sorted.map((atMs, position) => [atMs, position]));
 
   const ys = metrics.map((metric) => {

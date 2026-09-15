@@ -1,0 +1,40 @@
+.result {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+
+  &__notice {
+    align-items: flex-start;
+  }
+
+  &__changes {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  &__subtitle {
+    font-weight: 600;
+  }
+
+  &__list {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+  }
+
+  &__caption {
+    color: var(--mui-palette-text-secondary);
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 480px) {
+  .result {
+    padding: 12px;
+  }
+}

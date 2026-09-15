@@ -1,0 +1,26 @@
+.window {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+
+  &__options {
+    flex-wrap: wrap;
+  }
+
+  &__option {
+    min-width: 56px;
+    white-space: nowrap;
+  }
+
+  &__custom {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 12px;
+    padding-top: 6px;
+  }
+
+  &__note {
+    color: var(--mui-palette-text-secondary);
+    overflow-wrap: anywhere;
+  }
+}
