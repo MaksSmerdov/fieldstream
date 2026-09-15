@@ -72,14 +72,30 @@ export const syncAlarmRules = async (
   return inserted;
 };
 
-/** Уставки всех приборов для движка алармов: ключ уставки это прибор, метрика и режим. */
-export const loadAlarmRules = async (client: pg.ClientBase): Promise<AlarmRule[]> => {
+/** Какие уставки читать: всех приборов или перечисленных, только включённые или все. */
+export interface AlarmRuleFilter {
+  readonly deviceCodes?: readonly string[];
+  readonly includeDisabled?: boolean;
+}
+
+/**
+ * Уставки для движка алармов: ключ уставки это прибор, метрика и режим. По умолчанию включённые
+ * уставки всех приборов. Снимку перепрогона нужны и выключенные: правка может их включить.
+ */
+export const loadAlarmRules = async (
+  client: pg.ClientBase,
+  filter: AlarmRuleFilter = {},
+): Promise<AlarmRule[]> => {
   const result = await client.query<AlarmRuleRow>(
     `SELECT d.code AS device_code, r.metric_key, r.mode, r.min_value, r.max_value,
             r.hysteresis, r.debounce_cycles, r.severity, r.enabled
      FROM core.alarm_rules r JOIN core.devices d ON d.id = r.device_id
-     WHERE r.enabled
+     WHERE ($1::boolean OR r.enabled) AND ($2::text[] IS NULL OR d.code = ANY($2::text[]))
      ORDER BY d.code, r.metric_key, r.mode`,
+    [
+      filter.includeDisabled ?? false,
+      filter.deviceCodes === undefined ? null : [...filter.deviceCodes],
+    ],
   );
 
   return result.rows.map((row) => ({

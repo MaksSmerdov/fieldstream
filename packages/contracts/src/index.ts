@@ -18,6 +18,7 @@ export * from './api/lab.js';
 export * from './api/live.js';
 export * from './api/pipeline.js';
 export * from './api/read.js';
+export * from './api/replay.js';
 export * from './api/scenarios.js';
 export * from './topology/stand.js';
 export * from './topology/sim.js';
