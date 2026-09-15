@@ -7,6 +7,7 @@ import { LabPage } from '../pages/LabPage.js';
 import { LoginPage } from '../pages/LoginPage.js';
 import { OverviewPage } from '../pages/OverviewPage.js';
 import { PipelinePage } from '../pages/PipelinePage.js';
+import { ReplayPage } from '../pages/ReplayPage.js';
 
 /** Маршруты приложения. Каталог pages содержит только композицию, вся логика в features. */
 export const router = createBrowserRouter([
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
           { path: 'alarms', element: <AlarmsPage /> },
           { path: 'pipeline', element: <PipelinePage /> },
           { path: 'lab', element: <LabPage /> },
+          { path: 'replay', element: <ReplayPage /> },
         ],
       },
     ],

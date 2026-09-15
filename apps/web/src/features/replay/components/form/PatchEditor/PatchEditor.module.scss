@@ -1,0 +1,49 @@
+.patch {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--mui-palette-divider);
+  border-radius: 8px;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 12px;
+    min-height: 32px;
+  }
+
+  &__key {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+    gap: 4px 12px;
+    padding-top: 6px;
+  }
+
+  &__fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    align-items: start;
+    gap: 4px 12px;
+  }
+
+  &__bound {
+    display: grid;
+    justify-items: start;
+    gap: 0;
+    min-width: 0;
+  }
+
+  &__clear {
+    margin-top: -2px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .patch {
+    padding: 8px;
+  }
+}

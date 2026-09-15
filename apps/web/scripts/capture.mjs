@@ -125,6 +125,41 @@ const main = async () => {
   await scenarios.scrollIntoViewIfNeeded();
   await sleep(800);
   await page.screenshot({ path: join(OUT, 'scenarios.png') });
+
+  // Перепрогон: последний готовый прогон или новый с примером правки за час
+  await page.goto(`${BASE}/replay`);
+  await page.getByRole('region', { name: 'Последние перепрогоны', exact: true }).waitFor();
+  await sleep(1500);
+  const replayForm = page.getByRole('region', { name: 'Новый перепрогон', exact: true });
+  const replayResult = page.getByRole('region', { name: 'Разница срабатываний', exact: true });
+  if (!(await replayResult.isVisible())) {
+    try {
+      const submit = replayForm.getByRole('button', { name: 'Поставить перепрогон' });
+      await replayForm.getByRole('button', { name: 'Граница испарителя в оттайке +8' }).click();
+      await replayForm.getByRole('button', { name: '1 ч', exact: true }).click();
+      for (let second = 0; second < 120; second += 1) {
+        if ((await submit.getAttribute('aria-disabled')) !== 'true') break;
+        await sleep(1000);
+      }
+      await submit.click({ timeout: 5_000 });
+    } catch {
+      process.stdout.write(
+        'перепрогон не поставлен: стенд занят чужим прогоном, снимок как есть\n',
+      );
+    }
+  }
+  try {
+    await replayResult.waitFor({ timeout: 180_000 });
+    await page
+      .getByRole('img', { name: /^График RC-/ })
+      .waitFor({ timeout: 15_000 })
+      .catch(() => undefined);
+  } catch {
+    process.stdout.write('перепрогон не завершился за 3 мин, снимок без итога\n');
+  }
+  await replayResult.scrollIntoViewIfNeeded().catch(() => undefined);
+  await sleep(1500);
+  await page.screenshot({ path: join(OUT, 'replay.png') });
   await shots.close();
 
   // Ролик: обзор с живыми значениями, переход на прибор, смена окна графика
@@ -172,7 +207,7 @@ const main = async () => {
 
   await encodeGif(join(OUT, 'lab.gif'));
   process.stdout.write(
-    `снято: 9 картинок, обзор из ${String(tourFrames)} кадров, отказы из ${String(frames.length)} кадров\n`,
+    `снято: 10 картинок, обзор из ${String(tourFrames)} кадров, отказы из ${String(frames.length)} кадров\n`,
   );
 };
 

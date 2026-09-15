@@ -1,4 +1,4 @@
-import type { AlarmsQuery, PlanMode } from '@fieldstream/contracts';
+import type { AlarmsQuery, PlanMode, ReplayEpisodesQuery } from '@fieldstream/contracts';
 
 /**
  * Ключи кэша в одном месте. Живые события патчат кэш по этим же ключам, поэтому расхождение
@@ -32,4 +32,9 @@ export const queryKeys = {
   labFaults: ['lab', 'faults'] as const,
   scenarios: ['lab', 'scenarios'] as const,
   scenarioRun: (id: string) => ['lab', 'scenario-runs', id] as const,
+  replayRuns: ['replay', 'runs'] as const,
+  replayRun: (id: string) => ['replay', 'run', id] as const,
+  replayDiff: (id: string) => ['replay', 'run', id, 'diff'] as const,
+  replayEpisodes: (id: string, row: ReplayEpisodesQuery) =>
+    ['replay', 'run', id, 'episodes', row.deviceCode, row.metricKey, row.mode] as const,
 };

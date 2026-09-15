@@ -28,6 +28,7 @@ const sectionOf = (pathname: string, permissions: readonly ModuleId[]): string |
   if (pathname.startsWith('/pipeline'))
     return hasPermission(permissions, 'pipeline') && '/pipeline';
   if (pathname.startsWith('/lab')) return hasPermission(permissions, 'lab') && '/lab';
+  if (pathname.startsWith('/replay')) return hasPermission(permissions, 'replay') && '/replay';
   if (pathname.startsWith('/device')) return false;
 
   return '/';
@@ -71,6 +72,9 @@ export const AppLayout = (): React.JSX.Element => {
             ) : null}
             {hasPermission(permissions, 'lab') ? (
               <Tab label="Отказы" value="/lab" component={RouterLink} to="/lab" />
+            ) : null}
+            {hasPermission(permissions, 'replay') ? (
+              <Tab label="Перепрогон" value="/replay" component={RouterLink} to="/replay" />
             ) : null}
           </Tabs>
 

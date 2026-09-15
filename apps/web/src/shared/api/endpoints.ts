@@ -16,6 +16,10 @@ import {
   meResponseSchema,
   pipelineResponseSchema,
   readPlanResponseSchema,
+  replayDiffSchema,
+  replayEpisodesResponseSchema,
+  replayRunSchema,
+  replayRunsResponseSchema,
   scenarioRunSchema,
   scenariosResponseSchema,
   seriesResponseSchema,
@@ -49,6 +53,12 @@ import type {
   PipelineResponse,
   PlanMode,
   ReadPlanResponse,
+  ReplayDiff,
+  ReplayEpisodesQuery,
+  ReplayEpisodesResponse,
+  ReplayRequest,
+  ReplayRun,
+  ReplayRunsResponse,
   ScenarioRun,
   ScenarioRunRequestInput,
   ScenariosResponse,
@@ -223,4 +233,34 @@ export const api = {
 
   scenarioRun: async (id: string): Promise<ScenarioRun> =>
     request(`/api/scenario-runs/${id}`, (value) => scenarioRunSchema.parse(value)),
+
+  replayRuns: async (): Promise<ReplayRunsResponse> =>
+    request('/api/replay-runs', (value) => replayRunsResponseSchema.parse(value)),
+
+  startReplay: async (body: ReplayRequest): Promise<ReplayRun> =>
+    request('/api/replay-runs', (value) => replayRunSchema.parse(value), {
+      method: 'POST',
+      body,
+    }),
+
+  replayRun: async (id: string): Promise<ReplayRun> =>
+    request(`/api/replay-runs/${encodeURIComponent(id)}`, (value) => replayRunSchema.parse(value)),
+
+  replayDiff: async (id: string): Promise<ReplayDiff> =>
+    request(`/api/replay-runs/${encodeURIComponent(id)}/diff`, (value) =>
+      replayDiffSchema.parse(value),
+    ),
+
+  replayEpisodes: async (
+    id: string,
+    params: ReplayEpisodesQuery,
+  ): Promise<ReplayEpisodesResponse> =>
+    request(
+      `/api/replay-runs/${encodeURIComponent(id)}/episodes${query({
+        deviceCode: params.deviceCode,
+        metricKey: params.metricKey,
+        mode: params.mode,
+      })}`,
+      (value) => replayEpisodesResponseSchema.parse(value),
+    ),
 };
