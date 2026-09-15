@@ -62,6 +62,12 @@ const envSchema = z.object({
   SIM_URL: z.string().url().optional(),
   SCENARIOS_DIR: z.string().min(1).optional(),
   SCENARIO_POLL_MS: z.coerce.number().int().min(50).max(10_000).default(1_000),
+  /**
+   * Сколько перепрогон ждёт процессора: дольше значит, что перепрогон выключен или процессор не запущен.
+   * Порог должен быть заметно больше REPLAY_POLL_MS процессора и его уборки после прогона
+   * (повторы удаления группы), иначе шлюз снимет прогон, который процессор вот-вот заберёт.
+   */
+  REPLAY_QUEUE_TIMEOUT_MS: z.coerce.number().int().min(10_000).max(3_600_000).default(60_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

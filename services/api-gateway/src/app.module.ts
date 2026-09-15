@@ -28,6 +28,7 @@ import { AlarmsController } from './read/alarms.controller.js';
 import { BootController } from './read/boot.controller.js';
 import { DevicesController } from './read/devices.controller.js';
 import { TopologyController } from './read/topology.controller.js';
+import { ReplayController } from './replay/replay.controller.js';
 import { ScenariosController } from './scenarios/scenarios.controller.js';
 import { ScenariosService } from './scenarios/scenarios.service.js';
 import { DeviceRefsService } from './topology/device-refs.service.js';
@@ -63,6 +64,7 @@ export class AppModule {
         DlqController,
         LabController,
         ScenariosController,
+        ReplayController,
       ],
       providers: [
         { provide: ENV, useValue: deps.env },
