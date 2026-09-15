@@ -2,26 +2,32 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import type { PipelineResponse } from '@fieldstream/contracts';
 import { numberText } from '../../pipeline-words.js';
+import { DlqMessageList } from '../DlqMessageList/DlqMessageList.js';
+import { RedriveControl } from '../RedriveControl/RedriveControl.js';
 import styles from './DlqCard.module.scss';
 
 interface Props {
   readonly dlq: PipelineResponse['dlq'];
+  readonly canRedrive: boolean;
 }
 
-/** Очередь недоставленных: сколько кадров ждёт разбора и сколько попало туда всего. */
-export const DlqCard = ({ dlq }: Props): React.JSX.Element => (
+/** Очередь недоставленных: счёты, повторная подача и последние сообщения. */
+export const DlqCard = ({ dlq, canRedrive }: Props): React.JSX.Element => (
   <Paper
     variant="outlined"
     component="section"
     aria-label="Очередь недоставленных"
     className={styles['dlq']}
   >
-    <Typography variant="subtitle1" component="h2">
-      Очередь недоставленных
-    </Typography>
-    <Typography variant="caption" className={styles['dlq__hint']}>
-      Сюда процессор откладывает кадры, которые не смог разобрать.
-    </Typography>
+    <div className={styles['dlq__title']}>
+      <Typography variant="subtitle1" component="h2">
+        Очередь недоставленных
+      </Typography>
+      <Typography variant="caption" className={styles['dlq__hint']}>
+        Сюда процессор откладывает кадры, которые не смог разобрать. Их можно вернуть в обработку:
+        после третьей неудачи кадр отвергается окончательно.
+      </Typography>
+    </div>
 
     <dl className={styles['dlq__figures']}>
       <div className={styles['dlq__figure']}>
@@ -41,5 +47,9 @@ export const DlqCard = ({ dlq }: Props): React.JSX.Element => (
         <dd className={styles['dlq__value']}>{numberText(dlq.total)}</dd>
       </div>
     </dl>
+
+    <RedriveControl canRedrive={canRedrive} unresolved={dlq.unresolved} />
+
+    <DlqMessageList counts={dlq} />
   </Paper>
 );

@@ -1,0 +1,35 @@
+.redrive {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+
+  &__controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-height: 40px;
+  }
+
+  &__option {
+    min-width: 48px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__action {
+    white-space: nowrap;
+
+    &_waiting {
+      opacity: 0.6;
+    }
+  }
+
+  &__notice {
+    align-items: flex-start;
+  }
+
+  &__sending {
+    min-height: 24px;
+    color: var(--mui-palette-text-secondary);
+  }
+}

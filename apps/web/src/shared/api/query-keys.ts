@@ -26,6 +26,8 @@ export const queryKeys = {
       params.limit ?? 50,
     ] as const,
   pipeline: ['pipeline'] as const,
+  dlqMessages: ['dlq', 'messages'] as const,
+  dlqRedrive: (id: string) => ['dlq', 'redrive', id] as const,
   labLines: ['lab', 'lines'] as const,
   labFaults: ['lab', 'faults'] as const,
 };

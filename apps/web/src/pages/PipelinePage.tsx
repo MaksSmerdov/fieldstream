@@ -1,4 +1,5 @@
 import Typography from '@mui/material/Typography';
+import { hasPermission } from '@fieldstream/contracts';
 import { DlqCard } from '../features/pipeline/components/DlqCard/DlqCard.js';
 import { GroupCard } from '../features/pipeline/components/GroupCard/GroupCard.js';
 import { LagHistoryPanel } from '../features/pipeline/components/LagHistoryPanel/LagHistoryPanel.js';
@@ -8,6 +9,7 @@ import { RebalanceLog } from '../features/pipeline/components/RebalanceLog/Rebal
 import { TopicTable } from '../features/pipeline/components/TopicTable/TopicTable.js';
 import { useLagHistory } from '../features/pipeline/hooks/useLagHistory.js';
 import { usePipelineSnapshot } from '../features/pipeline/hooks/usePipelineSnapshot.js';
+import { useSessionStore } from '../shared/auth/session-store.js';
 import { EmptyState } from '../shared/ui/EmptyState/EmptyState.js';
 import { ErrorBanner } from '../shared/ui/ErrorBanner/ErrorBanner.js';
 import { ErrorState } from '../shared/ui/ErrorState/ErrorState.js';
@@ -18,6 +20,8 @@ import styles from './PipelinePage.module.scss';
 export const PipelinePage = (): React.JSX.Element => {
   const { data, hasData, isPending, isError, error, refetch } = usePipelineSnapshot();
   const history = useLagHistory(data);
+  const permissions = useSessionStore((state) => state.user?.permissions);
+  const canRedrive = hasPermission(permissions ?? [], 'pipeline.control');
 
   return (
     <>
@@ -77,7 +81,7 @@ export const PipelinePage = (): React.JSX.Element => {
 
           <TopicTable topics={data.topics} />
 
-          <DlqCard dlq={data.dlq} />
+          <DlqCard dlq={data.dlq} canRedrive={canRedrive} />
         </div>
       )}
     </>

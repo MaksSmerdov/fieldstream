@@ -1,0 +1,150 @@
+.messages {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+
+  &__viewport {
+    height: 360px;
+    min-width: 0;
+    overflow-y: auto;
+    border: 1px solid var(--mui-palette-divider);
+    border-radius: 8px;
+
+    &:focus-visible {
+      outline: 2px solid var(--mui-palette-primary-main);
+      outline-offset: 2px;
+    }
+  }
+
+  &__list {
+    display: grid;
+    margin: 0;
+    padding: 0 12px;
+    list-style: none;
+  }
+
+  &__item {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    min-height: 96px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--mui-palette-divider);
+    font-size: 0.85rem;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    min-height: 24px;
+  }
+
+  &__moment {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__quiet {
+    color: var(--mui-palette-text-secondary);
+    white-space: nowrap;
+  }
+
+  &__toggle {
+    display: inline-flex;
+    justify-content: flex-end;
+    min-width: 88px;
+    margin-left: auto;
+  }
+
+  &__details {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  &__place {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+    min-width: 0;
+    color: var(--mui-palette-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__key {
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    overflow-wrap: anywhere;
+  }
+
+  &__error {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+
+    &_open {
+      display: block;
+      overflow: visible;
+      -webkit-line-clamp: unset;
+    }
+  }
+
+  &__class {
+    color: var(--mui-palette-error-main);
+    font-weight: 600;
+  }
+
+  &__body {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  &__payload {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mui-palette-text-secondary);
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &_open {
+      overflow: visible;
+      overflow-wrap: anywhere;
+      text-overflow: clip;
+      white-space: pre-wrap;
+    }
+  }
+
+  &__more {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .messages {
+    &__viewport {
+      height: 420px;
+    }
+
+    &__list {
+      padding: 0 8px;
+    }
+  }
+}

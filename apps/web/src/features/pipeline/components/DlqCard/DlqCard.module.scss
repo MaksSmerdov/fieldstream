@@ -1,9 +1,15 @@
 .dlq {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
   padding: 14px 16px;
+
+  &__title {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
 
   &__hint {
     color: var(--mui-palette-text-secondary);
@@ -36,5 +42,11 @@
 
   &__value_warn {
     color: var(--mui-palette-warning-main);
+  }
+}
+
+@media (max-width: 480px) {
+  .dlq {
+    padding: 12px;
   }
 }

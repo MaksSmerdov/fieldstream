@@ -4,7 +4,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TOPICS, pipelineResponseSchema } from '@fieldstream/contracts';
+import { TOPICS, dlqListResponseSchema, pipelineResponseSchema } from '@fieldstream/contracts';
 import type { PipelineGroup, PipelineResponse } from '@fieldstream/contracts';
 import { PipelinePage } from '../src/pages/PipelinePage.js';
 import { queryKeys } from '../src/shared/api/query-keys.js';
@@ -90,11 +90,29 @@ type Reply = { readonly status: number; readonly body: PipelineResponse } | 'off
 let reply: Reply = { status: 200, body: snapshot() };
 let calls = 0;
 
-/** Ответ шлюза на запрос снимка: экран проходит через настоящий слой запросов и разбор схем. */
+const EMPTY_DLQ = dlqListResponseSchema.parse({
+  serverTime: SERVER_TIME,
+  items: [],
+  nextCursor: null,
+});
+
+/**
+ * Ответ шлюза на запрос снимка: экран проходит через настоящий слой запросов и разбор схем.
+ * Очередь недоставленных пуста, её список проверяется отдельно.
+ */
 const stubFetch = (): void => {
   Object.defineProperty(globalThis, 'fetch', {
     writable: true,
-    value: vi.fn(() => {
+    value: vi.fn((path: string) => {
+      if (path.startsWith('/api/dlq')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'x-server-time': SERVER_TIME }),
+          json: () => Promise.resolve(EMPTY_DLQ),
+        } as unknown as Response);
+      }
+
       calls += 1;
       const current = reply;
       if (current === 'offline') return Promise.reject(new Error('сеть недоступна'));

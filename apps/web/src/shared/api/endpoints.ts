@@ -9,6 +9,8 @@ import {
   deviceEventsResponseSchema,
   deviceProfileViewSchema,
   deviceSnapshotSchema,
+  dlqListResponseSchema,
+  dlqRedriveSchema,
   labFaultsResponseSchema,
   labLinesResponseSchema,
   meResponseSchema,
@@ -35,6 +37,9 @@ import type {
   DeviceEventsResponse,
   DeviceProfileView,
   DeviceSnapshot,
+  DlqListQuery,
+  DlqListResponse,
+  DlqRedrive,
   LabFaultRequestInput,
   LabFaultsResponse,
   LabLinesResponse,
@@ -168,6 +173,20 @@ export const api = {
 
   pipeline: async (): Promise<PipelineResponse> =>
     request('/api/pipeline', (value) => pipelineResponseSchema.parse(value)),
+
+  dlq: async (params: Partial<DlqListQuery>): Promise<DlqListResponse> =>
+    request(`/api/dlq${query({ limit: params.limit, cursor: params.cursor })}`, (value) =>
+      dlqListResponseSchema.parse(value),
+    ),
+
+  redriveDlq: async (max: number): Promise<DlqRedrive> =>
+    request('/api/dlq/redrive', (value) => dlqRedriveSchema.parse(value), {
+      method: 'POST',
+      body: { max },
+    }),
+
+  dlqRedrive: async (id: string): Promise<DlqRedrive> =>
+    request(`/api/dlq/redrive/${id}`, (value) => dlqRedriveSchema.parse(value)),
 
   labLines: async (): Promise<LabLinesResponse> =>
     request('/api/lab/lines', (value) => labLinesResponseSchema.parse(value)),
