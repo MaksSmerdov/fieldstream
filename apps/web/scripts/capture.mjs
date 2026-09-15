@@ -126,38 +126,56 @@ const main = async () => {
   await sleep(800);
   await page.screenshot({ path: join(OUT, 'scenarios.png') });
 
-  // Перепрогон: последний готовый прогон или новый с примером правки за час
+  // Перепрогон: свежий прогон с примером правки за 6 ч, чтобы в окно попали несколько оттаек
   await page.goto(`${BASE}/replay`);
   await page.getByRole('region', { name: 'Последние перепрогоны', exact: true }).waitFor();
   await sleep(1500);
   const replayForm = page.getByRole('region', { name: 'Новый перепрогон', exact: true });
   const replayResult = page.getByRole('region', { name: 'Разница срабатываний', exact: true });
-  if (!(await replayResult.isVisible())) {
-    try {
-      const submit = replayForm.getByRole('button', { name: 'Поставить перепрогон' });
-      await replayForm.getByRole('button', { name: 'Граница испарителя в оттайке +8' }).click();
-      await replayForm.getByRole('button', { name: '1 ч', exact: true }).click();
-      for (let second = 0; second < 120; second += 1) {
-        if ((await submit.getAttribute('aria-disabled')) !== 'true') break;
-        await sleep(1000);
-      }
-      await submit.click({ timeout: 5_000 });
-    } catch {
-      process.stdout.write(
-        'перепрогон не поставлен: стенд занят чужим прогоном, снимок как есть\n',
-      );
-    }
-  }
+  // Итог ждётся по номеру нового прогона: до его завершения на экране ещё виден прошлый результат
+  let replayRunId = null;
+  const replayDiff = page
+    .waitForResponse(
+      (response) =>
+        replayRunId !== null &&
+        response.url().includes(`/api/replay-runs/${replayRunId}/diff`) &&
+        response.ok(),
+      { timeout: 240_000 },
+    )
+    .catch(() => null);
   try {
-    await replayResult.waitFor({ timeout: 180_000 });
-    await page
-      .getByRole('img', { name: /^График RC-/ })
-      .waitFor({ timeout: 15_000 })
-      .catch(() => undefined);
+    const submit = replayForm.getByRole('button', { name: 'Поставить перепрогон' });
+    await replayForm.getByRole('button', { name: 'Граница испарителя в оттайке +8' }).click();
+    await replayForm.getByRole('button', { name: '6 ч', exact: true }).click();
+    for (let second = 0; second < 120; second += 1) {
+      if ((await submit.getAttribute('aria-disabled')) !== 'true') break;
+      await sleep(1000);
+    }
+    const posted = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/replay-runs',
+    );
+    await submit.click({ timeout: 5_000 });
+    const response = await posted;
+    if (response.status() === 202) replayRunId = (await response.json()).id;
   } catch {
-    process.stdout.write('перепрогон не завершился за 3 мин, снимок без итога\n');
+    process.stdout.write('перепрогон не поставлен: стенд занят чужим прогоном, снимок как есть\n');
   }
-  await replayResult.scrollIntoViewIfNeeded().catch(() => undefined);
+  if (replayRunId !== null && (await replayDiff) === null) {
+    process.stdout.write('перепрогон не завершился за 4 мин, снимок без итога\n');
+  }
+  await page
+    .getByRole('img', { name: /^График RC-/ })
+    .waitFor({ timeout: 15_000 })
+    .catch(() => undefined);
+  const replayChart = page.getByRole('region', { name: /^График: RC-/ });
+  const replayFocus = (await replayChart.isVisible()) ? replayChart : replayResult;
+  await replayFocus
+    .evaluate((element) => {
+      element.scrollIntoView({ block: 'end' });
+    })
+    .catch(() => undefined);
   await sleep(1500);
   await page.screenshot({ path: join(OUT, 'replay.png') });
   await shots.close();
