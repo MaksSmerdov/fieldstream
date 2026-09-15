@@ -9,9 +9,16 @@ import {
   insertDeviceEvents,
   insertReadings,
   recordDlqMessages,
+  resolveDlqCopies,
   withTransaction,
 } from '@fieldstream/db';
-import type { DeviceEventRow, DlqRow, OpenAlarmEpisode, ReadingRow } from '@fieldstream/db';
+import type {
+  DeviceEventRow,
+  DlqCopy,
+  DlqRow,
+  OpenAlarmEpisode,
+  ReadingRow,
+} from '@fieldstream/db';
 import { toIsoTimestamp } from '@fieldstream/domain';
 import type {
   Clock,
@@ -19,8 +26,14 @@ import type {
   MetricAlarmState,
   SpikeFilterState,
 } from '@fieldstream/domain';
-import { commitThrough, decodeMessage, headerText, toDlqMessage } from '@fieldstream/kafka';
-import type { RawOutgoingMessage } from '@fieldstream/kafka';
+import {
+  commitThrough,
+  decodeMessage,
+  headerText,
+  readDlqHistory,
+  toDlqMessage,
+} from '@fieldstream/kafka';
+import type { DlqHistory, RawOutgoingMessage } from '@fieldstream/kafka';
 import type { Logger } from '@fieldstream/nest-common';
 import { AlarmRulesService } from '../alarms/alarm-rules.service.js';
 import { HealthService } from '../health/health.service.js';
@@ -38,12 +51,17 @@ import {
 import type { AlarmOutcome } from './alarms.js';
 import { INGEST_GROUP } from './assignment.js';
 import { filterKey, processFrame } from './frame.js';
+import type { SpikeMemory } from './frame.js';
 
 const MAX_ATTEMPTS = 5;
 const BACKOFF_MS = [200, 500, 1_000, 2_500, 5_000] as const;
 
+/** Возвращённый из очереди кадр проходит фильтр скачков с чистого листа, а не по свежим значениям. */
+const NO_FILTERS: SpikeMemory = new Map();
+
 interface Poisoned {
   readonly message: KafkaMessage;
+  readonly history: DlqHistory;
   readonly errorClass: string;
   readonly error: string;
 }
@@ -71,6 +89,10 @@ const textHeaders = (message: KafkaMessage): Record<string, string> => {
  * а повтор ничего не меняет: ключи идемпотентности лежат в схеме базы.
  * Фильтры скачков и алармы в памяти только по своим приборам: при ребалансе отобранные
  * забываются, а новые приходят вместе с открытыми эпизодами из базы.
+ * Кадр, возвращённый из очереди недоставленных, старше всего, что уже видено по прибору: он только
+ * дописывает показания в базу и не трогает память, события, алармы и живой канал. Копия с номером
+ * строки очереди закрывает эту строку в той же транзакции, чем бы ни кончился её разбор, если
+ * топик и ключ строки совпадают с копией.
  */
 @Injectable()
 export class RawBatchService {
@@ -146,25 +168,41 @@ export class RawBatchService {
     const readings: TelemetryReading[] = [];
     const events: DeviceEventRow[] = [];
     const poisoned: Poisoned[] = [];
+    const redelivered: DlqCopy[] = [];
+    let replayed = 0;
     let lastOffset: string | null = null;
 
     for (const message of batch.messages) {
       if (!payload.isRunning() || payload.isStale()) break;
       lastOffset = message.offset;
+      const history = readDlqHistory(message.headers);
+      if (history.redriveOf !== null) {
+        redelivered.push({
+          id: history.redriveOf,
+          sourceTopic: batch.topic,
+          key: message.key?.toString('utf8') ?? null,
+        });
+      }
 
       const decoded = decodeMessage(TOPICS.telemetryRaw, message.value, message.headers);
       if (!decoded.ok) {
-        poisoned.push({ message, errorClass: decoded.errorClass, error: decoded.error });
+        poisoned.push({ message, history, errorClass: decoded.errorClass, error: decoded.error });
         continue;
       }
 
+      const replay = history.attempts > 0 || history.redriveOf !== null;
       const outcome = processFrame(decoded.payload, {
         refs: this.refs.current(),
-        filters,
+        filters: replay ? NO_FILTERS : filters,
         source: { partition: batch.partition, offset: message.offset },
       });
       if (outcome.kind === 'rejected') {
-        poisoned.push({ message, errorClass: outcome.errorClass, error: outcome.error });
+        poisoned.push({ message, history, errorClass: outcome.errorClass, error: outcome.error });
+        continue;
+      }
+      if (replay) {
+        rows.push(...outcome.rows);
+        replayed += 1;
         continue;
       }
 
@@ -194,8 +232,13 @@ export class RawBatchService {
 
     if (lastOffset === null) return;
 
-    const failedAt = toIsoTimestamp(this.clock.now());
-    const dlqMessages: RawOutgoingMessage[] = poisoned.map((item) =>
+    const handledAt = toIsoTimestamp(this.clock.now());
+    const failures = poisoned.map((item) => ({
+      item,
+      attempt: item.history.attempts + 1,
+      firstFailedAt: item.history.firstFailedAt ?? handledAt,
+    }));
+    const dlqMessages: RawOutgoingMessage[] = failures.map(({ item, attempt, firstFailedAt }) =>
       toDlqMessage(
         TOPICS.telemetryRawDlq,
         {
@@ -211,13 +254,13 @@ export class RawBatchService {
           errorClass: item.errorClass,
           error: item.error,
           consumerGroup: INGEST_GROUP,
-          attempt: 1,
-          firstFailedAt: failedAt,
+          attempt,
+          firstFailedAt,
         },
         PRODUCER_NAME,
       ),
     );
-    const dlqRows: DlqRow[] = poisoned.map((item) => ({
+    const dlqRows: DlqRow[] = failures.map(({ item, attempt, firstFailedAt }) => ({
       sourceTopic: batch.topic,
       partition: batch.partition,
       offset: item.message.offset,
@@ -226,6 +269,9 @@ export class RawBatchService {
       payload: item.message.value,
       errorClass: item.errorClass,
       error: item.error,
+      attempts: attempt,
+      firstSeen: firstFailedAt,
+      redriveOf: item.history.redriveOf,
     }));
 
     const raised = alarmOutcomes.filter((item) => item.transition.state === 'raised');
@@ -238,6 +284,7 @@ export class RawBatchService {
         await insertAlarmEvents(client, raised.map(raisedRowOf));
         await clearAlarmEvents(client, cleared.map(clearedRowOf));
         await recordDlqMessages(client, dlqRows);
+        await resolveDlqCopies(client, redelivered, handledAt);
         return count;
       });
       await this.producer.sendRaw(dlqMessages);
@@ -251,7 +298,7 @@ export class RawBatchService {
       ]);
 
       this.metrics.observeRows('readings', inserted);
-      this.metrics.observeFrames('accepted', readings.length);
+      this.metrics.observeFrames('accepted', readings.length + replayed);
       if (raised.length > 0) this.metrics.observeAlarms('raised', raised.length);
       if (cleared.length > 0) this.metrics.observeAlarms('cleared', cleared.length);
       for (const item of poisoned) {

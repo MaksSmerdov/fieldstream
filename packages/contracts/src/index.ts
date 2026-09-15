@@ -13,6 +13,7 @@ export * from './auth/dto.js';
 export * from './api/alarms.js';
 export * from './api/boot.js';
 export * from './api/commands.js';
+export * from './api/dlq.js';
 export * from './api/lab.js';
 export * from './api/live.js';
 export * from './api/pipeline.js';

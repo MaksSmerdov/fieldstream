@@ -13,6 +13,7 @@ interface TopicShape {
   readonly retentionMs: number | null;
   readonly configs?: Readonly<Record<string, string>>;
   readonly owner: string;
+  readonly redriver?: string;
   readonly why: string;
 }
 
@@ -177,6 +178,21 @@ describe('манифест топиков', () => {
     expect(foreign).toEqual([]);
     expect(TOPICS.telemetryRaw.owner).toBe('edge-collector');
     expect(TOPICS.telemetryReadings.owner).toBe('stream-processor');
+  });
+
+  it('повторно подаёт в топик только сервис из числа писателей и не сам владелец', () => {
+    const redrivable = SPECS.filter((spec) => spec.redriver !== undefined);
+    const foreign = redrivable
+      .filter((spec) => !WRITERS.includes(spec.redriver ?? ''))
+      .map((spec) => spec.name);
+    const selfRedrive = redrivable
+      .filter((spec) => spec.redriver === spec.owner)
+      .map((spec) => spec.name);
+
+    expect(foreign).toEqual([]);
+    expect(selfRedrive).toEqual([]);
+    expect(TOPICS.telemetryRaw.redriver).toBe('stream-processor');
+    expect(redrivable.map((spec) => spec.name)).toEqual([TOPICS.telemetryRaw.name]);
   });
 
   it('у компактируемого топика состояния нет retention, у остальных он задан', () => {

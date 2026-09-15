@@ -9,6 +9,7 @@ import { AuthGuard } from './auth/auth.guard.js';
 import { AuthService } from './auth/auth.service.js';
 import { MeController } from './auth/me.controller.js';
 import type { Env } from './config/env.js';
+import { DlqController } from './dlq/dlq.controller.js';
 import { EventsController } from './events/events.controller.js';
 import { KafkaBridgeService } from './events/kafka-bridge.service.js';
 import { LiveBusService } from './events/live-bus.service.js';
@@ -57,6 +58,7 @@ export class AppModule {
         CommandsController,
         BootController,
         PipelineController,
+        DlqController,
         LabController,
       ],
       providers: [

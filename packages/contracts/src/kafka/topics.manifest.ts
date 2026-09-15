@@ -21,6 +21,11 @@ export interface TopicSpec<S extends z.ZodTypeAny> {
   readonly configs?: Readonly<Record<string, string>>;
   /** Сервис, которому разрешено писать в топик. Двух писателей быть не должно. */
   readonly owner: string;
+  /**
+   * Сервис, который возвращает сообщения из очереди недоставленных в этот топик с исходным ключом.
+   * Единственное исключение из правила одного писателя: пишутся только исходные байты, а не новые данные.
+   */
+  readonly redriver?: string;
   readonly why: string;
 }
 
@@ -44,7 +49,11 @@ export const TOPICS = {
     retentionMs: 7 * DAY_MS,
     configs: { 'compression.type': 'gzip' },
     owner: 'edge-collector',
-    why: 'Семь дней это окно реплея: сырые кадры позволяют переиграть историю исправленным декодером.',
+    redriver: 'stream-processor',
+    why:
+      'Семь дней это окно реплея: сырые кадры позволяют переиграть историю исправленным декодером. ' +
+      'Процессор возвращает сюда сообщения из очереди недоставленных с исходным ключом: ' +
+      'это единственное исключение из правила одного писателя.',
   }),
   pollCycles: define({
     name: 'fieldstream.collector.cycles.v2',
@@ -168,4 +177,5 @@ export const KAFKA_HEADERS = Object.freeze({
   dlqAttempt: 'x-dlq-attempt',
   dlqFirstFailedAt: 'x-dlq-first-failed-at',
   dlqConsumerGroup: 'x-dlq-consumer-group',
+  dlqRedriveOf: 'x-dlq-redrive-of',
 });

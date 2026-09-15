@@ -6,6 +6,7 @@ import type { Logger } from '@fieldstream/nest-common';
 import { AlarmRulesService } from './alarms/alarm-rules.service.js';
 import { CommandResultsService } from './commands/results-consumer.service.js';
 import type { Env } from './config/env.js';
+import { DlqRedriveService } from './dlq/dlq-redrive.service.js';
 import { HealthService } from './health/health.service.js';
 import { HealthController } from './http/health.controller.js';
 import { MetricsController } from './http/metrics.controller.js';
@@ -48,6 +49,7 @@ export class AppModule {
         CyclesBatchService,
         IngestConsumerService,
         CommandResultsService,
+        DlqRedriveService,
       ],
     };
   }
