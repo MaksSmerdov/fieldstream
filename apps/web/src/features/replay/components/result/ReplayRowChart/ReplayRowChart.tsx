@@ -114,7 +114,11 @@ export const ReplayRowChart = ({ run, row, param, changedRule }: Props): React.J
   const precision = param?.precision ?? 1;
 
   const metric = data.series?.metrics.find((item) => item.metricKey === row.metricKey);
-  const aligned = useMemo(() => alignSeries(metric === undefined ? [] : [metric]), [metric]);
+  const bucketMs = data.series?.meta.bucketMs;
+  const aligned = useMemo(
+    () => alignSeries(metric === undefined ? [] : [metric], bucketMs),
+    [metric, bucketMs],
+  );
 
   const baseline = data.episodes?.baseline ?? [];
   const patched = data.episodes?.patched ?? [];
