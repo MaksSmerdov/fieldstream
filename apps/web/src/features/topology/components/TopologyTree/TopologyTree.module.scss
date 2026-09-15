@@ -179,7 +179,8 @@
 
     &__header > :nth-child(n + 4),
     &__mode,
-    &__age {
+    &__age,
+    &__alarms {
       display: none;
     }
 
