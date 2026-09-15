@@ -9,6 +9,7 @@ export interface ProcessorMetrics {
   readonly observeAlarms: (state: string, count: number) => void;
   readonly observeBatch: (topic: string, durationMs: number) => void;
   readonly observeTransient: (topic: string) => void;
+  readonly observeReplay: (outcome: string) => void;
 }
 
 /** Реестр метрик процесса: свои счётчики плюс стандартные метрики Node. */
@@ -53,6 +54,12 @@ export const createMetrics = (): ProcessorMetrics => {
     labelNames: ['topic'],
     registers: [registry],
   });
+  const replays = new Counter({
+    name: 'fieldstream_processor_replay_runs_total',
+    help: 'Перепрогоны уставок по исходу: выполнен, провален или отобран другим экземпляром',
+    labelNames: ['outcome'],
+    registers: [registry],
+  });
 
   return {
     registry,
@@ -73,6 +80,9 @@ export const createMetrics = (): ProcessorMetrics => {
     },
     observeTransient: (topic) => {
       transient.inc({ topic });
+    },
+    observeReplay: (outcome) => {
+      replays.inc({ outcome });
     },
   };
 };

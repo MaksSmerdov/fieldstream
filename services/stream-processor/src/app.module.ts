@@ -15,6 +15,7 @@ import { IngestConsumerService } from './ingest/ingest-consumer.service.js';
 import { RawBatchService } from './ingest/raw-batch.service.js';
 import type { ProcessorMetrics } from './metrics/metrics.js';
 import { ProducerService } from './publish/producer.service.js';
+import { ReplayRunnerService } from './replay/replay-runner.service.js';
 import { DeviceRefsService } from './topology/device-refs.service.js';
 import { CLOCK, ENV, INSTANCE_ID, LOGGER, METRICS, POOL } from './tokens.js';
 
@@ -50,6 +51,7 @@ export class AppModule {
         IngestConsumerService,
         CommandResultsService,
         DlqRedriveService,
+        ReplayRunnerService,
       ],
     };
   }
