@@ -30,6 +30,13 @@ const signIn = async (page) => {
   await page.getByRole('heading', { name: 'Обзор' }).waitFor();
 };
 
+/** Снимок экрана в docs/media со счётом снятого: число в итоге не должно расходиться с папкой. */
+let shotsTaken = 0;
+const shot = async (page, name) => {
+  await page.screenshot({ path: join(OUT, name) });
+  shotsTaken += 1;
+};
+
 /** Кадры GIF копятся в памяти сырыми пикселями: перекодировать их в файлы незачем. */
 let frames = [];
 
@@ -84,47 +91,47 @@ const main = async () => {
   await page.goto(`${BASE}/login`);
   await page.getByRole('button', { name: 'Войти' }).waitFor();
   await sleep(800);
-  await page.screenshot({ path: join(OUT, 'login.png') });
+  await shot(page, 'login.png');
 
   await signIn(page);
   await sleep(1500);
-  await page.screenshot({ path: join(OUT, 'overview.png') });
+  await shot(page, 'overview.png');
 
   await page.goto(`${BASE}/device/RC-101`);
   await page.getByRole('img', { name: /График прибора/ }).waitFor();
   await sleep(2500);
-  await page.screenshot({ path: join(OUT, 'device.png') });
+  await shot(page, 'device.png');
 
   await page.getByRole('tab', { name: 'Уставки' }).click();
   await page.getByText('Уставки по режимам').waitFor();
   await sleep(800);
-  await page.screenshot({ path: join(OUT, 'rules.png') });
+  await shot(page, 'rules.png');
 
   await page.getByRole('tab', { name: 'Карта регистров' }).click();
   await page.getByText(/запросов:/).waitFor();
   await sleep(500);
-  await page.screenshot({ path: join(OUT, 'read-plan.png') });
+  await shot(page, 'read-plan.png');
 
   await page.goto(`${BASE}/alarms`);
   await page.getByRole('heading', { name: 'Алармы' }).waitFor();
   await sleep(1500);
-  await page.screenshot({ path: join(OUT, 'alarms.png') });
+  await shot(page, 'alarms.png');
 
   await page.goto(`${BASE}/pipeline`);
   await page.getByRole('region', { name: 'Группа fs-processor', exact: true }).waitFor();
   await sleep(5000);
-  await page.screenshot({ path: join(OUT, 'pipeline.png') });
+  await shot(page, 'pipeline.png');
 
   await page.goto(`${BASE}/lab`);
   await page.getByText('Время ответа').waitFor();
   await sleep(2000);
-  await page.screenshot({ path: join(OUT, 'lab.png') });
+  await shot(page, 'lab.png');
 
   const scenarios = page.getByRole('region', { name: 'Сценарии', exact: true });
   await scenarios.getByRole('button', { name: 'Запустить' }).first().waitFor();
   await scenarios.scrollIntoViewIfNeeded();
   await sleep(800);
-  await page.screenshot({ path: join(OUT, 'scenarios.png') });
+  await shot(page, 'scenarios.png');
 
   // Перепрогон: свежий прогон с примером правки за 6 ч, чтобы в окно попали несколько оттаек
   await page.goto(`${BASE}/replay`);
@@ -177,7 +184,7 @@ const main = async () => {
     })
     .catch(() => undefined);
   await sleep(1500);
-  await page.screenshot({ path: join(OUT, 'replay.png') });
+  await shot(page, 'replay.png');
   await shots.close();
 
   // Ролик: обзор с живыми значениями, переход на прибор, смена окна графика
@@ -225,7 +232,7 @@ const main = async () => {
 
   await encodeGif(join(OUT, 'lab.gif'));
   process.stdout.write(
-    `снято: 10 картинок, обзор из ${String(tourFrames)} кадров, отказы из ${String(frames.length)} кадров\n`,
+    `снято картинок: ${String(shotsTaken)}, обзор из ${String(tourFrames)} кадров, отказы из ${String(frames.length)} кадров\n`,
   );
 };
 

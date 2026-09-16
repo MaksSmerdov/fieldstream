@@ -4,8 +4,6 @@ import {
   alarmRulesUpdateResponseSchema,
   alarmsResponseSchema,
   bootResponseSchema,
-  commandAcceptedSchema,
-  commandProgressSchema,
   deviceEventsResponseSchema,
   deviceProfileViewSchema,
   deviceSnapshotSchema,
@@ -13,7 +11,6 @@ import {
   dlqRedriveSchema,
   labFaultsResponseSchema,
   labLinesResponseSchema,
-  meResponseSchema,
   pipelineResponseSchema,
   readPlanResponseSchema,
   replayDiffSchema,
@@ -37,9 +34,6 @@ import type {
   AlarmsQuery,
   AlarmsResponse,
   BootResponse,
-  CommandAccepted,
-  CommandProgressResponse,
-  CommandRequest,
   DeviceEventsResponse,
   DeviceProfileView,
   DeviceSnapshot,
@@ -49,7 +43,6 @@ import type {
   LabFaultRequestInput,
   LabFaultsResponse,
   LabLinesResponse,
-  MeResponse,
   PipelineResponse,
   PlanMode,
   ReadPlanResponse,
@@ -101,8 +94,6 @@ export const api = {
 
   logout: async (): Promise<void> =>
     request('/api/auth/logout', () => undefined, { method: 'POST', anonymous: true }),
-
-  me: async (): Promise<MeResponse> => request('/api/me', (value) => meResponseSchema.parse(value)),
 
   topology: async () => request('/api/topology', (value) => topologyResponseSchema.parse(value)),
 
@@ -176,15 +167,6 @@ export const api = {
       (value) => alarmRulesUpdateResponseSchema.parse(value),
       { method: 'PUT', body: { rules } },
     ),
-
-  sendCommand: async (command: CommandRequest): Promise<CommandAccepted> =>
-    request('/api/commands', (value) => commandAcceptedSchema.parse(value), {
-      method: 'POST',
-      body: command,
-    }),
-
-  commandProgress: async (commandId: string): Promise<CommandProgressResponse> =>
-    request(`/api/commands/${commandId}`, (value) => commandProgressSchema.parse(value)),
 
   pipeline: async (): Promise<PipelineResponse> =>
     request('/api/pipeline', (value) => pipelineResponseSchema.parse(value)),

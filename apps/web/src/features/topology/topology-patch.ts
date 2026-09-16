@@ -61,7 +61,6 @@ export interface TopologySummary {
   readonly offline: number;
   readonly stale: number;
   readonly activeAlarms: number;
-  readonly acked: number;
 }
 
 export const summarize = (tree: TopologyResponse | undefined): TopologySummary => {
@@ -76,6 +75,5 @@ export const summarize = (tree: TopologyResponse | undefined): TopologySummary =
     offline: devices.filter((device) => device.status === 'offline').length,
     stale: devices.filter((device) => device.stale).length,
     activeAlarms: devices.reduce((total, device) => total + device.activeAlarms, 0),
-    acked: 0,
   };
 };

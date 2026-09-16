@@ -2,19 +2,11 @@ import { useEffect } from 'react';
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReplayRun } from '@fieldstream/contracts';
 import { api } from '../../../../shared/api/endpoints.js';
-import { ApiError } from '../../../../shared/api/http.js';
+import { isFatalPollError } from '../../../../shared/api/polling.js';
 import { queryKeys } from '../../../../shared/api/query-keys.js';
 import { isReplayFinished } from '../../replay-words.js';
 
 export const RUN_POLL_MS = 1_000;
-
-/** Ошибка опроса хода, которую повтор не исправит: прогона нет, нет права или ответ не по контракту. */
-export const isFatalRunError = (error: unknown): boolean => {
-  if (error === null || error === undefined) return false;
-  if (!(error instanceof ApiError)) return true;
-
-  return error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
-};
 
 export interface ReplayRunWatch {
   readonly run: ReplayRun | null;
@@ -42,7 +34,7 @@ export const useReplayRun = (id: string | null, listed: ReplayRun | null): Repla
       const { data, error } = state.state;
       if (data !== undefined && isReplayFinished(data)) return false;
 
-      return isFatalRunError(error) ? false : RUN_POLL_MS;
+      return isFatalPollError(error) ? false : RUN_POLL_MS;
     },
   });
 
@@ -57,7 +49,7 @@ export const useReplayRun = (id: string | null, listed: ReplayRun | null): Repla
     void client.invalidateQueries({ queryKey: queryKeys.replayRuns });
   }, [client, finishedId]);
 
-  const stopped = !settled && isFatalRunError(query.error);
+  const stopped = !settled && isFatalPollError(query.error);
 
   return {
     run,
