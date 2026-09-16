@@ -40,7 +40,7 @@ importers:
         version: 8.70.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   apps/web:
     dependencies:
@@ -134,7 +134,7 @@ importers:
         version: 8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   packages/contracts:
     dependencies:
@@ -147,7 +147,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   packages/db:
     dependencies:
@@ -184,7 +184,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   packages/device-profiles:
     dependencies:
@@ -206,7 +206,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   packages/domain:
     dependencies:
@@ -222,7 +222,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   packages/kafka:
     dependencies:
@@ -244,7 +244,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   packages/modbus-codec:
     dependencies:
@@ -260,7 +260,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   packages/nest-common:
     dependencies:
@@ -279,7 +279,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   packages/scenarios:
     dependencies:
@@ -304,7 +304,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   services/api-gateway:
     dependencies:
@@ -386,7 +386,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   services/device-sim:
     dependencies:
@@ -423,7 +423,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   services/edge-collector:
     dependencies:
@@ -481,7 +481,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   services/stream-processor:
     dependencies:
@@ -554,7 +554,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   tools/arch-check:
     devDependencies:
@@ -563,7 +563,26 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
+
+  tools/kafka-lab:
+    dependencies:
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.2
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   tools/scenario-ci:
     dependencies:
@@ -588,7 +607,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   tools/seed:
     dependencies:
@@ -628,7 +647,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
   tools/topic-matrix:
     dependencies:
@@ -647,7 +666,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)
 
 packages:
 
@@ -3617,7 +3636,6 @@ packages:
       '@vitest/ui': 4.1.11
       happy-dom: '*'
       jsdom: '*'
-      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
@@ -6700,7 +6718,7 @@ snapshots:
       tsx: 4.23.13
       yaml: 2.9.0
 
-  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0)):
+  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@28.1.0)(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0):
     dependencies:
       '@vitest/expect': 4.1.11
       '@vitest/mocker': 4.1.11(msw@2.15.0(@types/node@22.20.2)(typescript@5.9.3))(vite@8.3.0(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.104.1)(tsx@4.23.13)(yaml@2.9.0))
@@ -6727,7 +6745,18 @@ snapshots:
       '@types/node': 22.20.2
       jsdom: 28.1.0
     transitivePeerDependencies:
+      - '@vitejs/devtools'
+      - esbuild
+      - jiti
+      - less
       - msw
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - terser
+      - tsx
+      - yaml
 
   w3c-xmlserializer@5.0.0:
     dependencies:
