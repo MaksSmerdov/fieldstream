@@ -215,6 +215,30 @@ describe('вход и сессии на настоящей базе', () => {
   });
 
   /**
+   * Отказанная попытка ничего не стоит, поэтому она не может служить удержанием чужой учётной
+   * записи: поток дешёвых запросов не отодвигает точку отсчёта, и ведро пополняется по времени.
+   */
+  it('поток отказанных попыток не мешает ведру пополниться', async () => {
+    const attempt = (): Promise<Response> =>
+      fetch(`${base}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: 'squeezed@fieldstream.local', password: 'подбор пароля' }),
+      });
+
+    for (let index = 0; index < 5; index += 1) expect((await attempt()).status).toBe(401);
+    expect((await attempt()).status).toBe(429);
+
+    const codes: number[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      clock.advance(6_000);
+      codes.push((await attempt()).status);
+    }
+
+    expect(codes).toEqual([429, 429, 429, 429, 401]);
+  });
+
+  /**
    * За обратным прокси адрес запроса это адрес прокси. Без доверия к его заголовкам все
    * попытки входа со стенда попадали бы в одно ведро, и один подбирающий пароль закрывал бы
    * вход всем остальным.
