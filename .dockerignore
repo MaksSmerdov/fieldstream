@@ -4,6 +4,11 @@
 **/coverage
 **/*.tsbuildinfo
 **/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+apps/web/e2e
+apps/web/test-results
 .git
 .idea
 .vscode
