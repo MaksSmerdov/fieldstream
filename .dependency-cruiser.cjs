@@ -12,7 +12,7 @@ module.exports = {
       comment: 'domain не знает про ввод-вывод',
       severity: 'error',
       from: { path: '^packages/domain' },
-      to: { path: 'node_modules/(kafkajs|pg|drizzle-orm|@nestjs)' },
+      to: { path: 'node_modules/(kafkajs|pg|@nestjs)' },
     },
     {
       name: 'scenarios-through-ports',
@@ -20,7 +20,7 @@ module.exports = {
       severity: 'error',
       from: { path: '^packages/scenarios' },
       to: {
-        path: 'node_modules/(kafkajs|pg|drizzle-orm|@nestjs|fastify|undici|axios|ws|modbus-serial)|^packages/(db|kafka|nest-common)|^services/|^(node:)?(http|https|http2|net|tls|dgram)$',
+        path: 'node_modules/(kafkajs|pg|@nestjs|fastify|undici|axios|ws|modbus-serial)|^packages/(db|kafka|nest-common)|^services/|^(node:)?(http|https|http2|net|tls|dgram)$',
       },
     },
     {

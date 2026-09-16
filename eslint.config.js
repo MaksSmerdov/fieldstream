@@ -4,11 +4,15 @@ import tseslint from 'typescript-eslint';
 
 const noWallClock = {
   selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
-  message: 'Время берётся только из порта Clock (packages/domain/src/clock).',
+  message:
+    'Время берётся только из порта Clock: на сервере packages/domain/src/clock, ' +
+    'во фронте apps/web/src/shared/time/serverClock.ts.',
 };
 const noBareNewDate = {
   selector: 'NewExpression[callee.name="Date"][arguments.length=0]',
-  message: 'Время берётся только из порта Clock (packages/domain/src/clock).',
+  message:
+    'Время берётся только из порта Clock: на сервере packages/domain/src/clock, ' +
+    'во фронте apps/web/src/shared/time/serverClock.ts.',
 };
 
 export default tseslint.config(
@@ -41,7 +45,7 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          paths: ['kafkajs', 'pg', 'drizzle-orm', 'react'],
+          paths: ['kafkajs', 'pg', 'react'],
           patterns: ['@nestjs/*', 'node:*'],
         },
       ],
@@ -53,7 +57,7 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          paths: ['kafkajs', 'pg', 'drizzle-orm'],
+          paths: ['kafkajs', 'pg'],
           patterns: ['@nestjs/*'],
         },
       ],

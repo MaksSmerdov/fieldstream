@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { SignJWT, jwtVerify } from 'jose';
 import type { ModuleId, Role } from '@fieldstream/contracts';
 
@@ -86,10 +86,3 @@ export const newRefreshToken = (): string => randomBytes(32).toString('base64url
 /** В базе лежит хеш с перцем: утечка таблицы сессий не даёт войти ни в одну из них. */
 export const refreshTokenHash = (keys: AuthKeys, token: string): string =>
   createHash('sha256').update(`${keys.pepper}:${token}`).digest('hex');
-
-/** Сравнение токенов постоянного времени: длина заранее известна, утечки по времени нет. */
-export const sameToken = (left: string, right: string): boolean => {
-  const a = Buffer.from(left);
-  const b = Buffer.from(right);
-  return a.length === b.length && timingSafeEqual(a, b);
-};

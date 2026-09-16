@@ -4,14 +4,8 @@ import type { Kafka, Producer } from 'kafkajs';
 import type { z } from 'zod';
 import type { TopicSpec } from '@fieldstream/contracts';
 import type { Clock } from '@fieldstream/domain';
-import {
-  createKafkaClient,
-  createProducer,
-  encodeMessage,
-  sendMessages,
-  sendRawMessages,
-} from '@fieldstream/kafka';
-import type { OutgoingMessage, RawOutgoingMessage } from '@fieldstream/kafka';
+import { createKafkaClient, createProducer, encodeMessage, sendMessages } from '@fieldstream/kafka';
+import type { OutgoingMessage } from '@fieldstream/kafka';
 import { createThrottledLog } from '@fieldstream/nest-common';
 import type { Logger } from '@fieldstream/nest-common';
 import type { Env } from '../config/env.js';
@@ -84,10 +78,6 @@ export class ProducerService implements OnModuleInit, OnApplicationShutdown {
 
   public async send(messages: readonly OutgoingMessage[]): Promise<void> {
     await sendMessages(this.producer, messages);
-  }
-
-  public async sendRaw(messages: readonly RawOutgoingMessage[]): Promise<void> {
-    await sendRawMessages(this.producer, messages);
   }
 
   /** Подключение в фоне: недоступный брокер не роняет сервис, он просто не готов. */
