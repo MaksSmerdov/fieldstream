@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "arch": "depcruise packages services apps --config .dependency-cruiser.cjs",
+    "docs:links": "pnpm --filter @fieldstream/docs-links run check",
     "scenarios:ci": "pnpm --filter \"@fieldstream/scenario-ci^...\" run build && pnpm --filter @fieldstream/scenario-ci run scenarios",
     "bench": "pnpm --filter \"@fieldstream/bench^...\" run build && pnpm --filter @fieldstream/bench run bench",
     "topics:gen": "pnpm --filter @fieldstream/contracts run build && pnpm --filter @fieldstream/topic-matrix run gen",
