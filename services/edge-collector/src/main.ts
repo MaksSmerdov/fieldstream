@@ -21,11 +21,9 @@ app.enableShutdownHooks();
 await app.listen(env.COLLECTOR_HTTP_PORT, env.COLLECTOR_HOST);
 
 log.info(
-  { brokers: env.KAFKA_BROKERS, modbusHost: env.MODBUS_HOST_OVERRIDE ?? 'из стенда' },
-  'edge-collector: опрос линий Modbus TCP',
-);
-log.info(
   {
+    brokers: env.KAFKA_BROKERS,
+    modbusHost: env.MODBUS_HOST_OVERRIDE ?? 'из стенда',
     produces: [
       TOPICS.telemetryRaw.name,
       TOPICS.pollCycles.name,
@@ -34,7 +32,7 @@ log.info(
     ],
     consumes: [TOPICS.deviceCommands.name],
   },
-  'пишет сырые кадры, события циклов, состояние линий и ответы на команды, читает команды операторов',
+  'сборщик запущен',
 );
 log.info(
   { port: env.COLLECTOR_HTTP_PORT },

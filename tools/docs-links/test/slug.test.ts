@@ -3,7 +3,7 @@ import { collectSlugs, headingText, slugify } from '../src/slug.js';
 
 describe('якорь заголовка по правилам GitHub', () => {
   it('кириллица остаётся, регистр снижается, пробелы становятся дефисами', () => {
-    expect(slugify('Что бы я сделал иначе')).toBe('что-бы-я-сделал-иначе');
+    expect(slugify('Сценарии стенда')).toBe('сценарии-стенда');
     expect(slugify('Границы Сервисов')).toBe('границы-сервисов');
   });
 

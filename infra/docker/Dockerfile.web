@@ -14,8 +14,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
 
 # Сборка идёт со всеми зависимостями: у статики нет отдельного прода, а сборщик и типы
-# живут в devDependencies. В образ уезжает только каталог dist, и без карт исходников:
-# отдавать наружу весь исходный код ради отладки чужого браузера незачем
+# живут в devDependencies. В образ уезжает только каталог dist, без карт исходников
 FROM fetch AS build
 ENV WEB_SOURCEMAP=off
 COPY . .

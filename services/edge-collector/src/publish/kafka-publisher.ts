@@ -22,7 +22,7 @@ const METRICS_INTERVAL_MS = 5_000;
 
 /**
  * Публикация в Kafka. Опрос никогда не ждёт брокер: сообщение кладётся в ограниченный буфер,
- * отправка идёт в фоне. Недоступная Kafka не роняет сервис, он честно сообщает, что не готов.
+ * отправка идёт в фоне. Недоступная Kafka не роняет сервис: он сообщает, что не готов.
  */
 @Injectable()
 export class KafkaPublisher implements OnModuleInit, OnApplicationShutdown {

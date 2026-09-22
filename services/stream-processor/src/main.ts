@@ -41,11 +41,6 @@ log.info(
     instanceId,
     brokers: env.KAFKA_BROKERS,
     database: `${env.DATABASE_HOST}:${String(env.DATABASE_PORT)}`,
-  },
-  'stream-processor: разбор кадров, запись телеметрии, здоровье приборов',
-);
-log.info(
-  {
     group: INGEST_GROUP,
     consumes: [TOPICS.telemetryRaw.name, TOPICS.pollCycles.name],
     produces: [
@@ -55,7 +50,7 @@ log.info(
       TOPICS.telemetryRawDlq.name,
     ],
   },
-  'читает сырые кадры и циклы одной группой, пишет показания, алармы, состояние и очередь недоставленных',
+  'процессор запущен',
 );
 log.info({ port: env.PROCESSOR_HTTP_PORT }, 'GET /health/live, /health/ready, /metrics');
 

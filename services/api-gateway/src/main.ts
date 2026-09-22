@@ -33,11 +33,6 @@ log.info(
     instanceId,
     database: `${env.DATABASE_HOST}:${String(env.DATABASE_PORT)}`,
     origins: env.CORS_ORIGINS,
-  },
-  'api-gateway: чтение истории, алармы, живой канал',
-);
-log.info(
-  {
     consumes: [
       TOPICS.telemetryReadings.name,
       TOPICS.deviceState.name,
@@ -46,7 +41,7 @@ log.info(
     ],
     produces: [TOPICS.deviceCommands.name],
   },
-  'читает показания, состояние, алармы и снимки линий, пишет команды через очередь исходящих',
+  'шлюз запущен',
 );
 log.info({ port: env.GATEWAY_HTTP_PORT }, 'GET /health/live, /health/ready, /metrics, /api/events');
 

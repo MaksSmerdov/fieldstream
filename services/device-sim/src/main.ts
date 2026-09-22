@@ -39,7 +39,7 @@ app.log.info(
 );
 app.log.info(
   { lines: DEMO_STAND.lines.map((line) => `${line.code} :${line.port} ${line.baud} бод`) },
-  'Modbus TCP: порт на каждую линию, запросы в линию строго по очереди',
+  'порты линий открыты',
 );
 app.log.info(
   { port: env.SIM_HTTP_PORT },
