@@ -13,11 +13,11 @@ const FILES: Readonly<Record<string, string>> = {
   'README.md': [
     '# Заголовок',
     '',
-    '## Что здесь интересного',
+    '## Основные механизмы',
     '',
     '[![Проверки](../../actions/workflows/checks.yml/badge.svg)](../../actions/workflows/checks.yml)',
     '',
-    '[внутрь себя](#что-здесь-интересного)',
+    '[внутрь себя](#основные-механизмы)',
     '[в соседний документ](docs/STAND.md#замеры)',
     '[в каталог](docs/media)',
     '![картинка](docs/media/tour.gif)',

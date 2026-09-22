@@ -25,7 +25,7 @@ export type ModbusRequest =
     })
   | (FrameHeader & { readonly kind: 'rejected'; readonly exceptionCode: number });
 
-/** Решение стенда по запросу. Задержка stallMs добавляется к честному времени обмена на линии. */
+/** Решение стенда по запросу. Задержка stallMs добавляется к фактическому времени обмена на линии. */
 export type Answer =
   | { readonly kind: 'silent' }
   | { readonly kind: 'exception'; readonly code: number; readonly stallMs: number }

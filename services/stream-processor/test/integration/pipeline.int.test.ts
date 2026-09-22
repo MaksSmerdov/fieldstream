@@ -331,7 +331,7 @@ afterAll(async () => {
   await Promise.all([broker.stop(), db.stop()]);
 });
 
-describe('процессор на настоящих Kafka и TimescaleDB', () => {
+describe('процессор в контейнерах Kafka и TimescaleDB', () => {
   it('кадры ложатся в базу, а повтор после сброса смещений не добавляет ни строки', async () => {
     await publish(series('RC-101', 30));
 
