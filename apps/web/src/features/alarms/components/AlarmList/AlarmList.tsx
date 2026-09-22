@@ -41,8 +41,8 @@ const duration = (item: AlarmListItem): string => {
 
 const boundaryText = (item: AlarmListItem): string => {
   const sign = item.boundary === 'max' ? 'выше' : 'ниже';
-  const threshold = item.threshold === null ? '—' : String(item.threshold);
-  const value = item.value === null ? '—' : String(item.value);
+  const threshold = item.threshold === null ? '–' : String(item.threshold);
+  const value = item.value === null ? '–' : String(item.value);
 
   return `${value} ${sign} уставки ${threshold}`;
 };

@@ -7,7 +7,10 @@ import { ErrorBanner } from '../shared/ui/ErrorBanner/ErrorBanner.js';
 import { ErrorState } from '../shared/ui/ErrorState/ErrorState.js';
 import { SkeletonBlock } from '../shared/ui/SkeletonBlock/SkeletonBlock.js';
 
-/** Обзор стенда: сводка сверху, дерево объектов ниже. Состояния экрана честные, все четыре. */
+/**
+ * Обзор стенда: сводка сверху, дерево объектов ниже. Экран различает загрузку, отказ,
+ * пустоту и данные.
+ */
 export const OverviewPage = (): React.JSX.Element => {
   const { rows, summary, hasData, isPending, isError, error, refetch } = useTopologyRows();
 
