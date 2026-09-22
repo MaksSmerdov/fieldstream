@@ -536,7 +536,7 @@ describe('исполнитель перепрогона', () => {
     expect(kinds(db).slice(9)).toEqual(['BEGIN', 'finish', 'ROLLBACK']);
   });
 
-  it('остановка процессора прерывает прогон и честно завершает его с ошибкой', async () => {
+  it('остановка процессора прерывает прогон и завершает его с ошибкой', async () => {
     const db = fakeDb();
     const kafka = fakeKafka(WINDOW);
     const runner = service(db, kafka, {

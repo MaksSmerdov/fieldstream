@@ -173,7 +173,7 @@ export const DlqMessageList = ({ counts }: Props): React.JSX.Element => {
       {messages.hasData && messages.items.length === 0 ? (
         <EmptyState
           title="Очередь пуста"
-          hint="Процессору не попадалось кадров, которые он не смог разобрать. Это хорошая новость."
+          hint="Процессору не попадалось кадров, которые он не смог разобрать."
           actionLabel="Проверить снова"
           onAction={messages.refetch}
         />

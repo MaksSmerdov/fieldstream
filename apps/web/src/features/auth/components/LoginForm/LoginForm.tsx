@@ -111,10 +111,6 @@ export const LoginForm = (): React.JSX.Element => {
       <Button type="submit" variant="contained" disabled={state.pending}>
         {state.pending ? 'Входим' : 'Войти'}
       </Button>
-
-      <Typography variant="caption" color="text.secondary">
-        Учётные записи стенда: viewer, engineer, admin на fieldstream.local
-      </Typography>
     </Paper>
   );
 };

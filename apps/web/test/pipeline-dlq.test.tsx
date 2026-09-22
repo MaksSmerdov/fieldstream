@@ -387,7 +387,7 @@ describe('очередь недоставленных на экране конв
     });
   });
 
-  it('пустая очередь названа хорошей новостью, а вернуть нечего', async () => {
+  it('пустая очередь названа и объяснена причиной, а вернуть нечего', async () => {
     stand.snapshot = { ...SNAPSHOT, dlq: { unresolved: 0, total: 0 } };
     stand.pages = { '': page([], null) };
     show();
@@ -395,7 +395,7 @@ describe('очередь недоставленных на экране конв
     const dlq = await card();
 
     expect(await dlq.findByText('Очередь пуста')).toBeInTheDocument();
-    expect(dlq.getByText(/Это хорошая новость/)).toBeInTheDocument();
+    expect(dlq.getByText(/Процессору не попадалось кадров/)).toBeInTheDocument();
     expect(dlq.queryByRole('region', { name: 'Сообщения очереди недоставленных' })).toBeNull();
 
     const button = dlq.getByRole('button', { name: 'Вернуть в обработку' });

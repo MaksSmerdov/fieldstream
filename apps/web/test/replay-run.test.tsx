@@ -456,7 +456,7 @@ describe('ход перепрогона', () => {
     expect(readsOf(`/api/replay-runs/${RUN_ID}`)).toBe(polls);
   });
 
-  it('долгое ожидание в очереди честно объяснено', async () => {
+  it('долгое ожидание в очереди объяснено на экране', async () => {
     const waiting = run({ createdAt: at(-12_000) });
     stand.active = waiting;
     stand.runs = [waiting];
@@ -592,7 +592,7 @@ describe('итог перепрогона', () => {
     expect(scope.queryByRole('region', { name: 'Таблица разницы срабатываний' })).toBeNull();
   });
 
-  it('кадры не с начала окна дают честную строку покрытия', async () => {
+  it('кадры не с начала окна дают строку покрытия', async () => {
     const late = { ...DONE, coveredFrom: at(-1_800_000) };
     stand.runs = [late];
     stand.diff = { ...DIFF, run: late };

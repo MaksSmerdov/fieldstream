@@ -187,7 +187,7 @@ export class IngestConsumerService implements OnApplicationBootstrap, BeforeAppl
   /**
    * Открытые эпизоды и последнее состояние новых приборов. Каждая попытка ограничена по времени,
    * а все вместе заметно короче таймаута сессии: пачки ждут переезда, и без предела экземпляр
-   * вылетел бы из группы. После последней попытки null и честная запись в журнал.
+   * вылетел бы из группы. После последней попытки null и запись в журнал.
    */
   private async restore(deviceCodes: readonly string[]): Promise<Restored | null> {
     for (let attempt = 0; ; attempt += 1) {

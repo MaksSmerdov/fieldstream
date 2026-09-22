@@ -1,6 +1,6 @@
 name: Стенд
 
-# Тяжёлые проверки: они поднимают настоящие Kafka, TimescaleDB и весь стенд в Docker,
+# Тяжёлые проверки: поднимают Kafka, TimescaleDB и стенд в Docker,
 # поэтому идут на запрос слияния в main, на main, по расписанию и по кнопке,
 # а не на каждый пуш в рабочие ветки
 on:
@@ -42,7 +42,7 @@ env:
 
 jobs:
   integration:
-    name: Интеграционные тесты на настоящих Kafka и базе
+    name: Интеграционные тесты в контейнерах
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

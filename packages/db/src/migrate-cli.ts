@@ -24,7 +24,7 @@ const envSchema = z.object({
   DEMO_PASSWORD: z.string().min(8).default('fieldstream'),
 });
 
-/** Учётные записи стенда: по одной на роль, чтобы разницу прав было видно сразу. */
+/** Учётные записи стенда: по одной на каждую роль, пароль общий и берётся из DEMO_PASSWORD. */
 const demoUsers = (password: string): DemoUser[] => [
   { email: 'viewer@fieldstream.local', displayName: 'Наблюдатель', role: 'viewer', password },
   { email: 'engineer@fieldstream.local', displayName: 'Инженер', role: 'engineer', password },

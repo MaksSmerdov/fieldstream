@@ -35,11 +35,11 @@ await app.listen({ host: env.SIM_HOST, port: env.SIM_HTTP_PORT });
 
 app.log.info(
   { seed: env.SIM_SEED, speed: env.SIM_SPEED },
-  `device-sim: ${DEMO_STAND.devices.length} приборов на ${DEMO_STAND.lines.length} линиях`,
+  `стенд поднят: приборов ${DEMO_STAND.devices.length}, линий ${DEMO_STAND.lines.length}`,
 );
 app.log.info(
   { lines: DEMO_STAND.lines.map((line) => `${line.code} :${line.port} ${line.baud} бод`) },
-  'Modbus TCP: порт на каждую линию, запросы в линию строго по очереди',
+  'порты линий открыты',
 );
 app.log.info(
   { port: env.SIM_HTTP_PORT },

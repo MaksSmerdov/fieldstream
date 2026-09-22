@@ -39,7 +39,7 @@ export const ReplayRunList = ({ runs, selectedId, onSelect }: Props): React.JSX.
       {runs.length === 0 ? (
         <EmptyState
           title="Перепрогонов ещё не было"
-          hint="Поставьте первый: например, с готовой правкой границы испарителя в оттайке."
+          hint="Поставьте первый: выберите приборы, окно и правку уставки."
         />
       ) : (
         <ul className={styles['runs__list']} aria-label="Список перепрогонов">
