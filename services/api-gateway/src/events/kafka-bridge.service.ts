@@ -15,6 +15,9 @@ import { LiveBusService } from './live-bus.service.js';
 /** Не чаще одного показания в секунду на прибор: экрану этого хватает, каналу заметно легче. */
 const READING_THROTTLE_MS = 1_000;
 
+/** Выключен настройкой, подключён к брокеру или ещё нет. */
+export type BridgeState = 'off' | 'up' | 'down';
+
 /**
  * Мост из брокера в живой канал. Группа своя у каждого экземпляра шлюза: здесь нужен веер,
  * а не разделение работы, иначе при двух экземплярах половина событий уходила бы мимо вкладки.
@@ -44,7 +47,6 @@ export class KafkaBridgeService implements OnApplicationBootstrap, BeforeApplica
 
   public onApplicationBootstrap(): void {
     if (this.env.SSE_BRIDGE === 'off') {
-      this.running = true;
       this.log.info({}, 'мост живого канала выключен: события из брокера не читаются');
       return;
     }
@@ -58,8 +60,11 @@ export class KafkaBridgeService implements OnApplicationBootstrap, BeforeApplica
     await this.consumer.disconnect();
   }
 
-  public isRunning(): boolean {
-    return this.running;
+  /** Состояние моста: выключен настройкой, подключён к брокеру или ещё нет. */
+  public state(): BridgeState {
+    if (this.env.SSE_BRIDGE === 'off') return 'off';
+
+    return this.running ? 'up' : 'down';
   }
 
   private async start(): Promise<void> {

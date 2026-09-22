@@ -6,7 +6,6 @@ import type { AlarmsQuery, PlanMode, ReplayEpisodesQuery } from '@fieldstream/co
  */
 export const queryKeys = {
   boot: ['boot'] as const,
-  me: ['me'] as const,
   topology: ['topology'] as const,
   snapshot: (code: string) => ['device', code, 'snapshot'] as const,
   profile: (code: string) => ['device', code, 'profile'] as const,

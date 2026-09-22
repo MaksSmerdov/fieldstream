@@ -1,30 +1,18 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import type { Page, Response } from '@playwright/test';
+import type { Response } from '@playwright/test';
 import {
   FINISHED_REPLAY_RUN_STATUSES,
   replayRunSchema,
   replayRunsResponseSchema,
 } from '@fieldstream/contracts';
 import type { ReplayRun, ReplayRunStatus } from '@fieldstream/contracts';
+import { violationsOf } from './axe.js';
 
 const EMAIL = process.env['E2E_EMAIL'] ?? 'engineer@fieldstream.local';
 const PASSWORD = process.env['E2E_PASSWORD'] ?? 'fieldstream';
 
 /** Сколько ждать итога перепрогона: окно в пятнадцать минут процессор читает за секунды. */
 const RUN_LIMIT_MS = 240_000;
-
-/** Нарушения доступности на живом экране по тем же правилам, что и у остальных экранов. */
-const violationsOf = async (page: Page): Promise<string[]> => {
-  const result = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze();
-
-  return result.violations.map(
-    (violation) =>
-      `${violation.id} (${violation.impact ?? 'без оценки'}): ${violation.help}, узлов ${String(violation.nodes.length)}`,
-  );
-};
 
 /**
  * Итог прогона из ответа опроса хода или перечитанного списка; null, если ответ не про этот

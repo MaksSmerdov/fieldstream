@@ -1,0 +1,26 @@
+{
+  "name": "@fieldstream/bench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fieldstream/contracts": "workspace:*",
+    "@fieldstream/db": "workspace:*",
+    "@fieldstream/domain": "workspace:*",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.23.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.11"
+  }
+}

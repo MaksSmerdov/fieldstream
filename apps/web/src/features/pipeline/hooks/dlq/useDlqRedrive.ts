@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DlqRedrive } from '@fieldstream/contracts';
 import { api } from '../../../../shared/api/endpoints.js';
-import { ApiError } from '../../../../shared/api/http.js';
+import { isFatalPollError } from '../../../../shared/api/polling.js';
 import { queryKeys } from '../../../../shared/api/query-keys.js';
 
 export const REDRIVE_POLL_MS = 1_000;
@@ -15,14 +15,6 @@ export type RedriveWatchStop = 'unreadable' | 'timeout';
 export const isRedriveFinished = (redrive: DlqRedrive | undefined): boolean =>
   redrive?.status === 'done' || redrive?.status === 'failed';
 
-/** Ошибка опроса, которую повтор не исправит: запроса нет, нет права или ответ не по контракту. */
-export const isFatalProgressError = (error: unknown): boolean => {
-  if (error === null || error === undefined) return false;
-  if (!(error instanceof ApiError)) return true;
-
-  return error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
-};
-
 /** Шаг хода: предел ожидания отсчитывается заново при каждой смене состояния. */
 const stepOf = (redrive: DlqRedrive): string => `${redrive.id}|${redrive.status}`;
 
@@ -33,7 +25,7 @@ const stopOf = (
   expiredStep: string | null,
 ): RedriveWatchStop | null => {
   if (step === null) return null;
-  if (isFatalProgressError(error)) return 'unreadable';
+  if (isFatalPollError(error)) return 'unreadable';
 
   return step === expiredStep ? 'timeout' : null;
 };
@@ -79,7 +71,7 @@ export const useDlqRedrive = (): DlqRedriveControl => {
     retry: false,
     refetchInterval: (query) => {
       const { data, error } = query.state;
-      if (data === undefined || isRedriveFinished(data) || isFatalProgressError(error)) {
+      if (data === undefined || isRedriveFinished(data) || isFatalPollError(error)) {
         return false;
       }
 

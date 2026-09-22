@@ -64,6 +64,21 @@
     &__tabs {
       order: 3;
       flex: 1 1 100%;
+      width: calc(100% + 32px);
+      margin-inline: -16px;
+
+      :global(.MuiTabs-scrollButtons) {
+        display: none;
+      }
+
+      :global(.MuiTabs-list) {
+        padding-inline-start: 16px;
+
+        &::after {
+          flex: 0 0 16px;
+          content: '';
+        }
+      }
     }
   }
 }

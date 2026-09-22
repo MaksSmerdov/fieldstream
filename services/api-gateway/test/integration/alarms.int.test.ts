@@ -291,13 +291,13 @@ describe('лента алармов', () => {
       method: 'POST',
       body: '{}',
     });
-    expect(acked.status).toBe(201);
+    expect(acked.status).toBe(200);
 
     const again = await call(`/api/alarms/${target.id}/ack`, engineerToken, {
       method: 'POST',
       body: '{}',
     });
-    expect(again.status).toBe(201);
+    expect(again.status).toBe(200);
 
     const list = alarmsResponseSchema.parse(
       (await call('/api/alarms?limit=1', engineerToken)).json,

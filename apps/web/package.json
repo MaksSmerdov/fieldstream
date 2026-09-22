@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
+    "e2e": "playwright test",
     "shots": "node scripts/capture.mjs"
   },
   "dependencies": {

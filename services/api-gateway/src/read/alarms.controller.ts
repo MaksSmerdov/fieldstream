@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Inject,
   NotFoundException,
   Param,
@@ -56,6 +57,7 @@ export class AlarmsController {
 
   /** Подтверждение аларма. Первый подтвердивший остаётся в записи, повтор её не переписывает. */
   @Post(':id/ack')
+  @HttpCode(200)
   @RequirePermission('alarms.ack')
   public async ack(
     @Param('id') id: string,

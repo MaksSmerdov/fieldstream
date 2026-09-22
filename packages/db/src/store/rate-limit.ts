@@ -15,11 +15,13 @@ export interface BucketDecision {
   readonly allowed: boolean;
   readonly tokens: number;
   readonly retryAfterMs: number;
+  readonly refilledAtMs: number;
 }
 
 /**
  * Пополнение и списание, чистая арифметика. Ведро копит по токену за refillMs и не выше ёмкости.
- * Цена ноль это вопрос «можно ли», цена единица это отметка неудачной попытки.
+ * Цена ноль это вопрос «можно ли», цена единица это отметка неудачной попытки. Точка отсчёта
+ * сдвигается только на выданные токены, поэтому частые проверки не отменяют пополнение.
  */
 export const takeToken = (
   state: BucketState | null,
@@ -28,15 +30,22 @@ export const takeToken = (
   cost = 1,
 ): BucketDecision => {
   const previous = state ?? { tokens: settings.capacity, refilledAtMs: nowMs };
-  const gained = Math.floor(Math.max(0, nowMs - previous.refilledAtMs) / settings.refillMs);
+  const waited = Math.max(0, nowMs - previous.refilledAtMs);
+  const gained = Math.floor(waited / settings.refillMs);
   const available = Math.min(settings.capacity, previous.tokens + gained);
+  const refilledAtMs =
+    available >= settings.capacity ? nowMs : previous.refilledAtMs + gained * settings.refillMs;
 
   if (available <= 0) {
-    const waited = Math.max(0, nowMs - previous.refilledAtMs) % settings.refillMs;
-    return { allowed: false, tokens: 0, retryAfterMs: settings.refillMs - waited };
+    return {
+      allowed: false,
+      tokens: 0,
+      retryAfterMs: settings.refillMs - (waited % settings.refillMs),
+      refilledAtMs,
+    };
   }
 
-  return { allowed: true, tokens: Math.max(0, available - cost), retryAfterMs: 0 };
+  return { allowed: true, tokens: Math.max(0, available - cost), retryAfterMs: 0, refilledAtMs };
 };
 
 /**
@@ -68,7 +77,7 @@ export const consumeRateLimit = async (
     await client.query(
       `INSERT INTO core.rate_limit (bucket_key, tokens, refilled_at) VALUES ($1, $2, $3)
        ON CONFLICT (bucket_key) DO UPDATE SET tokens = $2, refilled_at = $3`,
-      [bucketKey, decision.tokens, new Date(nowMs).toISOString()],
+      [bucketKey, decision.tokens, new Date(decision.refilledAtMs).toISOString()],
     );
     await client.query('COMMIT');
 

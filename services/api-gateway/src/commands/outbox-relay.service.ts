@@ -3,7 +3,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import type pg from 'pg';
 import { TOPICS, deviceCommandSchema } from '@fieldstream/contracts';
-import { claimOutbox, markOutboxFailed, markOutboxPublished } from '@fieldstream/db';
+import {
+  claimOutbox,
+  markOutboxFailed,
+  markOutboxPublished,
+  markOutboxRejected,
+} from '@fieldstream/db';
 import type { OutboxRow } from '@fieldstream/db';
 import { toIsoTimestamp } from '@fieldstream/domain';
 import type { Clock } from '@fieldstream/domain';
@@ -16,6 +21,12 @@ import { CLOCK, ENV, LOGGER, POOL } from '../tokens.js';
 
 /** Отсрочка перед следующей попыткой: растёт с числом неудач, но не выше минуты. */
 const retryDelayMs = (attempts: number): number => Math.min(60_000, 500 * 2 ** (attempts - 1));
+
+/** С какой по счёту попытки неразбираемая строка больше не перекладывается. */
+export const FINAL_ATTEMPTS = 3;
+
+/** Причина отказа: повторы её не исправят, разбирать нечего. */
+const BROKEN_ERROR = 'сообщение не разбирается схемой своего топика';
 
 /**
  * Отправка очереди исходящих в брокер. Команда попадает в очередь той же транзакцией,
@@ -66,27 +77,18 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnModuleDestr
 
       const messages: OutgoingMessage[] = [];
       const ids: string[] = [];
-      const broken: string[] = [];
+      const broken: OutboxRow[] = [];
 
       for (const row of rows) {
         const message = this.toMessage(row);
-        if (message === null) broken.push(row.id);
+        if (message === null) broken.push(row);
         else {
           messages.push(message);
           ids.push(row.id);
         }
       }
 
-      if (broken.length > 0) {
-        await withClient(this.pool, (client) =>
-          markOutboxFailed(
-            client,
-            broken,
-            'сообщение не разбирается схемой своего топика',
-            toIsoTimestamp(this.clock.now() + 60_000),
-          ),
-        );
-      }
+      if (broken.length > 0) await this.rejectBroken(broken);
       if (messages.length === 0) return 0;
 
       try {
@@ -110,6 +112,28 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnModuleDestr
       }
     } finally {
       this.ticking = false;
+    }
+  }
+
+  /**
+   * Неразбираемая строка ещё раз ждёт своей очереди, а с предельной попытки получает
+   * окончательный отказ: вечное перекладывание держало бы место в очереди навсегда.
+   */
+  private async rejectBroken(rows: readonly OutboxRow[]): Promise<void> {
+    const rejected = rows.filter((row) => row.attempts >= FINAL_ATTEMPTS).map((row) => row.id);
+    const retried = rows.filter((row) => row.attempts < FINAL_ATTEMPTS).map((row) => row.id);
+
+    await withClient(this.pool, async (client) => {
+      await markOutboxRejected(client, rejected, BROKEN_ERROR);
+      await markOutboxFailed(
+        client,
+        retried,
+        BROKEN_ERROR,
+        toIsoTimestamp(this.clock.now() + 60_000),
+      );
+    });
+    if (rejected.length > 0) {
+      this.log.warn({ ids: rejected }, 'очередь исходящих: строки отклонены окончательно');
     }
   }
 

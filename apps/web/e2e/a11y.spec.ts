@@ -1,24 +1,9 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { violationsOf } from './axe.js';
 
 const EMAIL = process.env['E2E_EMAIL'] ?? 'engineer@fieldstream.local';
 const PASSWORD = process.env['E2E_PASSWORD'] ?? 'fieldstream';
-
-/**
- * Нарушения доступности на живых экранах. Проверка идёт в браузере, а не по разметке в тестах:
- * половина нарушений видна только с настоящими стилями, например контраст и порядок заголовков.
- */
-const violationsOf = async (page: Page): Promise<string[]> => {
-  const result = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze();
-
-  return result.violations.map(
-    (violation) =>
-      `${violation.id} (${violation.impact ?? 'без оценки'}): ${violation.help}, узлов ${String(violation.nodes.length)}`,
-  );
-};
 
 const signIn = async (page: Page): Promise<void> => {
   await page.goto('/login');

@@ -19,5 +19,7 @@ export default defineConfig({
       },
     },
   },
-  build: { outDir: 'dist', sourcemap: true },
+  // Карты исходников нужны при локальной отладке сборки, но в публичный образ им незачем:
+  // сборка образа выставляет WEB_SOURCEMAP=off и dist уезжает в nginx без них
+  build: { outDir: 'dist', sourcemap: process.env['WEB_SOURCEMAP'] !== 'off' },
 });

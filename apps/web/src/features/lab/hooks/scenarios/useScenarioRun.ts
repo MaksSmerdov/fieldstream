@@ -3,18 +3,11 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 import type { ScenarioRun } from '@fieldstream/contracts';
 import { api } from '../../../../shared/api/endpoints.js';
 import { ApiError } from '../../../../shared/api/http.js';
+import { isFatalPollError } from '../../../../shared/api/polling.js';
 import { queryKeys } from '../../../../shared/api/query-keys.js';
 import { isRunFinished } from '../../scenario-words.js';
 
 export const RUN_POLL_MS = 1_000;
-
-/** Ошибка опроса хода, которую повтор не исправит: прогона нет, нет права или ответ не по контракту. */
-export const isFatalRunError = (error: unknown): boolean => {
-  if (error === null || error === undefined) return false;
-  if (!(error instanceof ApiError)) return true;
-
-  return error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
-};
 
 /** Шлюз отказал в запуске, потому что стенд занят другим прогоном. */
 const isBusyRejection = (error: unknown): boolean =>
@@ -104,14 +97,14 @@ export const useScenarioRun = (listed: ScenarioRun | null): ScenarioRunWatch => 
       const { data, error } = query.state;
       if (data !== undefined && isRunFinished(data)) return false;
 
-      return isFatalRunError(error) ? false : RUN_POLL_MS;
+      return isFatalPollError(error) ? false : RUN_POLL_MS;
     },
   });
 
   const fallback = listed !== null && listed.id === runId ? listed : null;
   const run = runId === null ? null : (progress.data ?? fallback);
   const finishedId = run !== null && isRunFinished(run) ? run.id : null;
-  const stopped = run !== null && finishedId === null && isFatalRunError(progress.error);
+  const stopped = run !== null && finishedId === null && isFatalPollError(progress.error);
   const activeRun = activeOf(run, listed, stopped);
   const activeId = activeRun?.id ?? null;
   const busyRejected = mutation.isError && isBusyRejection(mutation.error);

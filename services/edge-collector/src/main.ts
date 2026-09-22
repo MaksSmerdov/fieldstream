@@ -26,10 +26,15 @@ log.info(
 );
 log.info(
   {
-    produces: [TOPICS.telemetryRaw.name, TOPICS.pollCycles.name, TOPICS.commandResults.name],
+    produces: [
+      TOPICS.telemetryRaw.name,
+      TOPICS.pollCycles.name,
+      TOPICS.lineStatus.name,
+      TOPICS.commandResults.name,
+    ],
     consumes: [TOPICS.deviceCommands.name],
   },
-  'пишет сырые кадры, события циклов и ответы на команды, читает команды операторов',
+  'пишет сырые кадры, события циклов, состояние линий и ответы на команды, читает команды операторов',
 );
 log.info(
   { port: env.COLLECTOR_HTTP_PORT },
