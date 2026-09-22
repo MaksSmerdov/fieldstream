@@ -21,7 +21,7 @@ const NO_PERMISSIONS: readonly ModuleId[] = [];
 
 /**
  * Раздел, в котором сейчас находится пользователь. У экрана прибора своей вкладки нет:
- * приборов двадцать четыре, и попадают на них из обзора, поэтому там не подсвечено ничего.
+ * на него попадают из обзора, поэтому там не подсвечено ничего.
  */
 const sectionOf = (pathname: string, permissions: readonly ModuleId[]): string | false => {
   if (pathname.startsWith('/alarms')) return '/alarms';
@@ -36,7 +36,7 @@ const sectionOf = (pathname: string, permissions: readonly ModuleId[]): string |
 
 /**
  * Оболочка держит единственное соединение живого канала на вкладку. Подписка идёт без ключей,
- * то есть на весь стенд: на двадцати четырёх приборах дробить её по экранам нечего.
+ * то есть на весь стенд: дробить её по экранам нечего.
  */
 export const AppLayout = (): React.JSX.Element => {
   const { pathname } = useLocation();
